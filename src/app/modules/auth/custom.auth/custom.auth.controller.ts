@@ -75,6 +75,21 @@ const resendOtp = catchAsync(async (req: Request, res: Response) => {
   })
 })
 
+const changePassword = catchAsync(async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body
+  const result = await CustomAuthServices.changePassword(
+    req.user!,
+    currentPassword,
+    newPassword,
+  )
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Password changed successfully',
+    data: result,
+  })
+})
+
 export const CustomAuthController = {
   forgetPassword,
   resetPassword,
@@ -82,4 +97,5 @@ export const CustomAuthController = {
   customLogin,
   getRefreshToken,
   resendOtp,
+  changePassword,
 }

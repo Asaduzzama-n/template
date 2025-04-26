@@ -5,6 +5,8 @@ import { PassportAuthController } from './passport.auth/passport.auth.controller
 import { CustomAuthController } from './custom.auth/custom.auth.controller'
 import validateRequest from '../../middleware/validateRequest'
 import { AuthValidations } from './auth.validation'
+import { USER_ROLES } from '../../../enum/user'
+import auth from '../../middleware/auth'
 
 const router = express.Router()
 
@@ -55,6 +57,12 @@ router.post(
   CustomAuthController.resendOtp,
 )
 
+router.post(
+  '/change-password',
+  auth(USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.GUEST),
+  validateRequest(AuthValidations.changePasswordZodSchema),
+  CustomAuthController.changePassword,
+)
 router.post('/refresh-token', CustomAuthController.getRefreshToken)
 
 export const AuthRoutes = router

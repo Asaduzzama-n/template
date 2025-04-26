@@ -34,11 +34,12 @@
     "@typescript-eslint/parser": "^8.19.1",
     "colors": "^1.4.0",
     "eslint": "^9.18.0",
-    "express-module-generator": "^1.0.5",
+    "express-module-generator": "^1.1.1",
     "husky": "^9.1.7",
     "multer": "^1.4.5-lts.1",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "siuuu-module-generator": "^1.2.3",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.3"
   },

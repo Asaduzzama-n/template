@@ -2,7 +2,7 @@ import { Secret } from 'jsonwebtoken'
 import { jwtHelper } from '../../../helpers/jwtHelper'
 import config from '../../../config'
 import { Types } from 'mongoose'
-import { USER_ROLES } from '../../../enum/user'
+import bcrypt from 'bcrypt'
 
 const createToken = (authId: Types.ObjectId, role: string) => {
   const accessToken = jwtHelper.createToken(
@@ -19,4 +19,11 @@ const createToken = (authId: Types.ObjectId, role: string) => {
   return { accessToken, refreshToken }
 }
 
-export const AuthHelper = { createToken }
+const isPasswordMatched = async (
+  plainTextPassword: string,
+  hashedPassword: string,
+) => {
+  return await bcrypt.compare(plainTextPassword, hashedPassword)
+}
+
+export const AuthHelper = { createToken, isPasswordMatched }

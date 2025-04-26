@@ -110,6 +110,27 @@ const resendOtpZodSchema = z.object({
   }),
 })
 
+const changePasswordZodSchema = z.object({
+  body: z
+    .object({
+      currentPassword: z.string({
+        required_error: 'Current password is required',
+      }),
+      newPassword: z
+        .string({
+          required_error: 'New password is required',
+        })
+        .min(8, 'Password must be at least 8 characters'),
+      confirmPassword: z.string({
+        required_error: 'Confirm password is required',
+      }),
+    })
+    .refine(data => data.newPassword === data.confirmPassword, {
+      message: 'Passwords do not match',
+      path: ['confirmPassword'],
+    }),
+})
+
 export const AuthValidations = {
   verifyEmailOrPhoneOtpZodSchema,
   forgetPasswordZodSchema,
@@ -117,4 +138,5 @@ export const AuthValidations = {
   loginZodSchema,
   verifyAccountZodSchema,
   resendOtpZodSchema,
+  changePasswordZodSchema,
 }

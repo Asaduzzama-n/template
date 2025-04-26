@@ -393,6 +393,49 @@ const resendOtp = async (email?: string, phone?: string) => {
   return 'OTP sent successfully.'
 }
 
+const changePassword = async (
+  user: JwtPayload,
+  currentPassword: string,
+  newPassword: string,
+) => {
+  // Find the user with password field
+  const isUserExist = await User.findById(user.authId)
+    .select('+password')
+    .lean()
+
+  if (!isUserExist) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found')
+  }
+
+  // Check if current password matches
+  const isPasswordMatch = await AuthHelper.isPasswordMatched(
+    currentPassword,
+    isUserExist.password as string,
+  )
+
+  if (!isPasswordMatch) {
+    throw new ApiError(
+      StatusCodes.UNAUTHORIZED,
+      'Current password is incorrect',
+    )
+  }
+
+  // Hash the new password
+  const hashedPassword = await bcrypt.hash(
+    newPassword,
+    Number(config.bcrypt_salt_rounds),
+  )
+
+  // Update the password
+  await User.findByIdAndUpdate(
+    user.authId,
+    { password: hashedPassword },
+    { new: true },
+  )
+
+  return { message: 'Password changed successfully' }
+}
+
 export const CustomAuthServices = {
   forgetPassword,
   resetPassword,
@@ -403,4 +446,5 @@ export const CustomAuthServices = {
   resendOtpToPhoneOrEmail,
   deleteAccount,
   resendOtp,
+  changePassword,
 }
