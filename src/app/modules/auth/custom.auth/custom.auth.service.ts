@@ -17,7 +17,7 @@ import { JwtPayload } from 'jsonwebtoken'
 
 const customLogin = async (payload: ILoginData) => {
   const { email, phone } = payload
-  const query = email ? { email: email.toLowerCase() } : { phone: phone }
+  const query = email ? { email: email.toLowerCase().trim() } : { phone: phone }
 
   const isUserExist = await User.findOne({
     ...query,

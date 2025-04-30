@@ -3,8 +3,7 @@ import ApiError from '../../../errors/ApiError'
 import { IUser } from './user.interface'
 import { User } from './user.model'
 
-import { USER_ROLES, USER_STATUS } from '../../../enum/user'
-import { Customer } from '../customer/customer.model'
+import { USER_STATUS } from '../../../enum/user'
 import { generateOtp } from '../../../utils/crypto'
 import { emailTemplate } from '../../../shared/emailTemplate'
 import { emailHelper } from '../../../helpers/emailHelper'
@@ -12,7 +11,7 @@ import { JwtPayload } from 'jsonwebtoken'
 
 const createUser = async (payload: IUser): Promise<IUser | null> => {
   //check if user already exist
-  payload.email = payload.email?.toLowerCase()
+  payload.email = payload.email?.toLowerCase().trim()
   const isUserExist = await User.findOne({
     email: payload.email,
     status: { $nin: [USER_STATUS.DELETED] },

@@ -1658,10 +1658,10 @@ asynckit@^0.4.0:
   resolved "https://registry.npmjs.org/asynckit/-/asynckit-0.4.0.tgz"
   integrity sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==
 
-axios@^1.7.8:
-  version "1.8.1"
-  resolved "https://registry.npmjs.org/axios/-/axios-1.8.1.tgz"
-  integrity sha512-NN+fvwH/kV01dYUQ3PTOZns4LWtWhOFCAhQ/pHb88WQ1hNe5V/dvFwc4VJcDL11LT9xSX0QtsR8sWUuyOuOq7g==
+axios@^1.7.8, axios@^1.9.0:
+  version "1.9.0"
+  resolved "https://registry.npmjs.org/axios/-/axios-1.9.0.tgz"
+  integrity sha512-re4CqKTJaURpzbLHtIi6XpDv20/CnpXOtjRY5/CU32L8gU8ek9UIivcfvSWvmKEngmVbrUtPpdDwWDWL7DNHvg==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.0"
@@ -1900,11 +1900,6 @@ commander@^11.1.0:
   version "11.1.0"
   resolved "https://registry.npmjs.org/commander/-/commander-11.1.0.tgz"
   integrity sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ==
-
-commander@^9.5.0:
-  version "9.5.0"
-  resolved "https://registry.npmjs.org/commander/-/commander-9.5.0.tgz"
-  integrity sha512-KRs7WVDKg86PWiuAqhDrAQnTXZKraVcCc6vFdL14qrZ/DcWwuRo7VoiYXalXO7S5GKpqYiVEwCbgFDfxNHKJBQ==
 
 concat-map@0.0.1:
   version "0.0.1"
@@ -2301,13 +2296,6 @@ etag@~1.8.1:
   version "1.8.1"
   resolved "https://registry.npmjs.org/etag/-/etag-1.8.1.tgz"
   integrity sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==
-
-express-module-generator@^1.1.1:
-  version "1.1.1"
-  resolved "https://registry.npmjs.org/express-module-generator/-/express-module-generator-1.1.1.tgz"
-  integrity sha512-+aqifXNjqmB/q2rVl1ZACpQFggo8+xrTVbOXcezL+b1KypRGI+nqZ5uHtlnNKO2lGKhOoUmPBBcbvuqKzQWapA==
-  dependencies:
-    commander "^9.5.0"
 
 express@^4.21.2:
   version "4.21.2"
@@ -2827,6 +2815,16 @@ kuler@^2.0.0:
   version "2.0.0"
   resolved "https://registry.npmjs.org/kuler/-/kuler-2.0.0.tgz"
   integrity sha512-Xq9nH7KlWZmXAtodXDDRE7vs6DU1gTU8zYDHDiWLSip45Egwq3plLHzPn27NgvzL2r1LMPC1vdqh98sQxtqj4A==
+
+leo-module-generator@^2.0.14:
+  version "2.0.14"
+  resolved "https://registry.npmjs.org/leo-module-generator/-/leo-module-generator-2.0.14.tgz"
+  integrity sha512-uTaTF24/mR7juCbc5jqu1mtoo2i/GjBXa2FbTHT3mYqsVnuXXmneSjhLimRvLCMMTbFXkI3FryJ7B6UXsLWuKg==
+  dependencies:
+    axios "^1.9.0"
+    commander "^11.1.0"
+    handlebars "^4.7.8"
+    uuid "^11.1.0"
 
 levn@^0.4.1:
   version "0.4.1"
@@ -3637,14 +3635,6 @@ simple-swizzle@^0.2.2:
   dependencies:
     is-arrayish "^0.3.1"
 
-siuuu-module-generator@^1.2.3:
-  version "1.2.3"
-  resolved "https://registry.npmjs.org/siuuu-module-generator/-/siuuu-module-generator-1.2.3.tgz"
-  integrity sha512-tyozJU3GAbNk3TKuH/M50hmSzXBIuNXF8kHBA183yneXxdhtvvzt8DCGj+LWji42pKIAsWsRHFuQtniglQUfyg==
-  dependencies:
-    commander "^11.1.0"
-    handlebars "^4.7.8"
-
 socket.io-adapter@~2.5.2:
   version "2.5.5"
   resolved "https://registry.npmjs.org/socket.io-adapter/-/socket.io-adapter-2.5.5.tgz"
@@ -3951,6 +3941,11 @@ utils-merge@^1.0.1, utils-merge@1.0.1, utils-merge@1.x.x:
   version "1.0.1"
   resolved "https://registry.npmjs.org/utils-merge/-/utils-merge-1.0.1.tgz"
   integrity sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==
+
+uuid@^11.1.0:
+  version "11.1.0"
+  resolved "https://registry.npmjs.org/uuid/-/uuid-11.1.0.tgz"
+  integrity sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==
 
 uuid@^9.0.1:
   version "9.0.1"
