@@ -7,6 +7,7 @@ import config from './config'
 import { errorLogger, logger } from './shared/logger'
 import { socketHelper } from './helpers/socketHelper'
 import { jwtHelper } from './helpers/jwtHelper'
+import { UserServices } from './app/modules/user/user.service'
 
 //uncaught exception
 process.on('uncaughtException', error => {
@@ -37,6 +38,10 @@ async function main() {
         origin: '*',
       },
     })
+
+    //create admin user
+    await UserServices.createAdmin()
+
     socketHelper.socket(io)
     //@ts-ignore
     global.io = io

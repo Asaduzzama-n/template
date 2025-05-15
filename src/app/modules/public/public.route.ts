@@ -22,19 +22,19 @@ router.post(
 )
 
 router.post(
-  '/',
+  '/faq',
   auth(USER_ROLES.ADMIN),
   validateRequest(FaqValidations.create),
   PublicController.createFaq,
 )
 router.patch(
-  '/:id',
+  '/faq/:id',
   auth(USER_ROLES.ADMIN),
   validateRequest(FaqValidations.update),
   PublicController.updateFaq,
 )
-router.get('/', PublicController.getAllFaqs)
-router.get('/:id', PublicController.getSingleFaq)
-router.delete('/:id', auth(USER_ROLES.ADMIN), PublicController.deleteFaq)
+router.get('/faq/single/:id', PublicController.getSingleFaq)
+router.get('/faq/all', PublicController.getAllFaqs)
+router.delete('/faq/:id', auth(USER_ROLES.ADMIN), PublicController.deleteFaq)
 
 export const PublicRoutes = router

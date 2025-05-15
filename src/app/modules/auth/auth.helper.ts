@@ -19,6 +19,16 @@ const createToken = (authId: Types.ObjectId, role: string) => {
   return { accessToken, refreshToken }
 }
 
+const tempAccessToken = (authId: Types.ObjectId, role: string) => {
+  const accessToken = jwtHelper.createToken(
+    { authId, role },
+    'asjdhashd#$uaas98',
+    config.jwt.jwt_expire_in as string,
+  )
+
+  return { accessToken }
+}
+
 const isPasswordMatched = async (
   plainTextPassword: string,
   hashedPassword: string,

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { USER_ROLES } from '../../../enum/user'
 
 const verifyEmailOrPhoneOtpZodSchema = z.object({
   body: z.object({
@@ -37,18 +38,6 @@ const forgetPasswordZodSchema = z.object({
 
 const resetPasswordZodSchema = z.object({
   body: z.object({
-    email: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
-        message: 'Invalid email format',
-      }),
-    phone: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-        message: 'Invalid phone number format',
-      }),
     newPassword: z.string().min(8, { message: 'Password is required' }),
     confirmPassword: z
       .string()
@@ -131,6 +120,27 @@ const changePasswordZodSchema = z.object({
     }),
 })
 
+const createUserZodSchema = z.object({
+  body: z.object({
+    email: z.string({ required_error: 'Email is required' }).email(),
+    password: z.string({ required_error: 'Password is required' }).min(6),
+    name: z.string({ required_error: 'Name is required' }).optional(),
+    phone: z.string({ required_error: 'Phone is required' }).optional(),
+    address: z.string().optional(),
+    role: z.enum(
+      [
+        USER_ROLES.ADMIN,
+        USER_ROLES.USER,
+        USER_ROLES.GUEST,
+        USER_ROLES.CUSTOMER,
+      ],
+      {
+        message: 'Role must be one of admin, user, guest',
+      },
+    ),
+  }),
+})
+
 export const AuthValidations = {
   verifyEmailOrPhoneOtpZodSchema,
   forgetPasswordZodSchema,
@@ -139,4 +149,5 @@ export const AuthValidations = {
   verifyAccountZodSchema,
   resendOtpZodSchema,
   changePasswordZodSchema,
+  createUserZodSchema,
 }

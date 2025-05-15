@@ -112,7 +112,7 @@ const createFaq = async (payload: IFaq) => {
 }
 
 const getAllFaqs = async () => {
-  const result = await Faq.find()
+  const result = await Faq.find({})
   return result
 }
 

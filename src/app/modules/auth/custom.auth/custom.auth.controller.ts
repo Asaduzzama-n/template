@@ -41,11 +41,8 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 
 const verifyAccount = catchAsync(async (req: Request, res: Response) => {
   const { oneTimeCode, phone, email } = req.body
-  const result = await CustomAuthServices.verifyAccount(
-    oneTimeCode,
-    email,
-    phone,
-  )
+  const user = req.user
+  const result = await CustomAuthServices.verifyAccount(user!, oneTimeCode)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -67,7 +64,7 @@ const getRefreshToken = catchAsync(async (req: Request, res: Response) => {
 
 const resendOtp = catchAsync(async (req: Request, res: Response) => {
   const { email, phone } = req.body
-  const result = await CustomAuthServices.resendOtp(email, phone)
+  const result = await CustomAuthServices.resendOtp(req.user!)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -90,6 +87,17 @@ const changePassword = catchAsync(async (req: Request, res: Response) => {
   })
 })
 
+const createUser = catchAsync(async (req: Request, res: Response) => {
+  const { ...userData } = req.body
+  const result = await CustomAuthServices.createUser(userData)
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'User created successfully',
+    data: result,
+  })
+})
+
 export const CustomAuthController = {
   forgetPassword,
   resetPassword,
@@ -98,4 +106,5 @@ export const CustomAuthController = {
   getRefreshToken,
   resendOtp,
   changePassword,
+  createUser,
 }

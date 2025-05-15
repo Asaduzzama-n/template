@@ -6,9 +6,15 @@ import { CustomAuthController } from './custom.auth/custom.auth.controller'
 import validateRequest from '../../middleware/validateRequest'
 import { AuthValidations } from './auth.validation'
 import { USER_ROLES } from '../../../enum/user'
-import auth from '../../middleware/auth'
+import auth, { tempAuth } from '../../middleware/auth'
 
 const router = express.Router()
+
+router.post(
+  '/signup',
+  validateRequest(AuthValidations.createUserZodSchema),
+  CustomAuthController.createUser,
+)
 
 router.post(
   '/login',
@@ -30,6 +36,12 @@ router.get(
 
 router.post(
   '/verify-account',
+  tempAuth(
+    USER_ROLES.ADMIN,
+    USER_ROLES.USER,
+    USER_ROLES.GUEST,
+    USER_ROLES.CUSTOMER,
+  ),
   validateRequest(AuthValidations.verifyAccountZodSchema),
   CustomAuthController.verifyAccount,
 )
@@ -47,12 +59,24 @@ router.post(
 )
 router.post(
   '/reset-password',
+  tempAuth(
+    USER_ROLES.ADMIN,
+    USER_ROLES.USER,
+    USER_ROLES.GUEST,
+    USER_ROLES.CUSTOMER,
+  ),
   validateRequest(AuthValidations.resetPasswordZodSchema),
   CustomAuthController.resetPassword,
 )
 
 router.post(
   '/resend-otp',
+  tempAuth(
+    USER_ROLES.ADMIN,
+    USER_ROLES.USER,
+    USER_ROLES.GUEST,
+    USER_ROLES.CUSTOMER,
+  ),
   validateRequest(AuthValidations.resendOtpZodSchema),
   CustomAuthController.resendOtp,
 )

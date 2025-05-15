@@ -2816,10 +2816,10 @@ kuler@^2.0.0:
   resolved "https://registry.npmjs.org/kuler/-/kuler-2.0.0.tgz"
   integrity sha512-Xq9nH7KlWZmXAtodXDDRE7vs6DU1gTU8zYDHDiWLSip45Egwq3plLHzPn27NgvzL2r1LMPC1vdqh98sQxtqj4A==
 
-leo-module-generator@^2.0.14:
-  version "2.0.14"
-  resolved "https://registry.npmjs.org/leo-module-generator/-/leo-module-generator-2.0.14.tgz"
-  integrity sha512-uTaTF24/mR7juCbc5jqu1mtoo2i/GjBXa2FbTHT3mYqsVnuXXmneSjhLimRvLCMMTbFXkI3FryJ7B6UXsLWuKg==
+leo-module-generator@^2.0.15:
+  version "2.0.15"
+  resolved "https://registry.npmjs.org/leo-module-generator/-/leo-module-generator-2.0.15.tgz"
+  integrity sha512-eHoBe6itvLxn2ExSw7jibckjoO7W2lKRIEqmT2yhA+1DgJ71/XxGzKQtjBIpwToyNhZ/wceNmq5rpppTb/ZWFg==
   dependencies:
     axios "^1.9.0"
     commander "^11.1.0"
