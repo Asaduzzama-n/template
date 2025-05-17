@@ -8,7 +8,7 @@ import { Token } from '../../token/token.model'
 import { IResetPassword } from '../auth.interface'
 import { emailHelper } from '../../../../helpers/emailHelper'
 import { emailTemplate } from '../../../../shared/emailTemplate'
-import cryptoToken, { generateOtp } from '../../../../utils/crypto'
+import { generateOtp } from '../../../../utils/crypto'
 import bcrypt from 'bcrypt'
 import { ILoginData } from '../../../../interfaces/auth'
 import { AuthCommonServices } from '../common'
@@ -168,7 +168,7 @@ const resetPassword = async (resetToken: string, payload: IResetPassword) => {
     )
   }
 
-  const isTokenValid = authentication?.expiresAt! > new Date()
+  const isTokenValid = isTokenExist?.expireAt > new Date()
   if (!isTokenValid) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
@@ -178,7 +178,7 @@ const resetPassword = async (resetToken: string, payload: IResetPassword) => {
 
   const hashPassword = await bcrypt.hash(
     newPassword,
-    config.bcrypt_salt_rounds as string,
+    Number(config.bcrypt_salt_rounds),
   )
   const updatedUserData = {
     password: hashPassword,
