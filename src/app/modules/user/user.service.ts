@@ -10,54 +10,7 @@ import { emailHelper } from '../../../helpers/emailHelper'
 import { JwtPayload } from 'jsonwebtoken'
 import { logger } from '../../../shared/logger'
 
-const createUser = async (payload: IUser): Promise<IUser | null> => {
-  //check if user already exist
-  payload.email = payload.email?.toLowerCase().trim()
-  const isUserExist = await User.findOne({
-    email: payload.email,
-    status: { $nin: [USER_STATUS.DELETED] },
-  })
 
-  if (isUserExist) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      `An account with this email already exist, please login or try with another email.`,
-    )
-  }
-
-  const user = await User.create([payload])
-  if (!user) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user')
-  }
-
-  const otp = generateOtp()
-  const otpExpiresIn = new Date(Date.now() + 5 * 60 * 1000)
-  const authentication = {
-    oneTimeCode: otp,
-    expiresAt: otpExpiresIn,
-    latestRequestAt: new Date(),
-    authType: 'createAccount',
-  }
-
-  await User.findByIdAndUpdate(
-    user[0]._id,
-    {
-      $set: { authentication },
-    },
-    { new: true },
-  )
-
-  //send email or sms with otp
-  const createAccount = emailTemplate.createAccount({
-    name: user[0].name!,
-    email: user[0].email!,
-    otp,
-  })
-
-  emailHelper.sendEmail(createAccount)
-
-  return user[0]
-}
 
 const updateProfile = async (user: JwtPayload, payload: Partial<IUser>) => {
   // console.log(first)
@@ -109,4 +62,4 @@ const createAdmin = async (): Promise<Partial<IUser> | null> => {
   return result[0]
 }
 
-export const UserServices = { createUser, updateProfile, createAdmin }
+export const UserServices = {  updateProfile, createAdmin }

@@ -36,12 +36,6 @@ router.get(
 
 router.post(
   '/verify-account',
-  tempAuth(
-    USER_ROLES.ADMIN,
-    USER_ROLES.USER,
-    USER_ROLES.GUEST,
-    USER_ROLES.CUSTOMER,
-  ),
   validateRequest(AuthValidations.verifyAccountZodSchema),
   CustomAuthController.verifyAccount,
 )
@@ -59,12 +53,6 @@ router.post(
 )
 router.post(
   '/reset-password',
-  tempAuth(
-    USER_ROLES.ADMIN,
-    USER_ROLES.USER,
-    USER_ROLES.GUEST,
-    USER_ROLES.CUSTOMER,
-  ),
   validateRequest(AuthValidations.resetPasswordZodSchema),
   CustomAuthController.resetPassword,
 )
@@ -86,6 +74,13 @@ router.post(
   auth(USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.GUEST),
   validateRequest(AuthValidations.changePasswordZodSchema),
   CustomAuthController.changePassword,
+)
+
+router.delete(
+  '/delete-account',
+  auth(USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.GUEST),
+  validateRequest(AuthValidations.deleteAccount),
+  CustomAuthController.deleteAccount,
 )
 router.post('/refresh-token', CustomAuthController.getRefreshToken)
 
