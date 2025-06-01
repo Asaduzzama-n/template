@@ -3,19 +3,10 @@ import { Request, Response, NextFunction } from 'express'
 import { StatusCodes } from 'http-status-codes'
 import catchAsync from '../../../shared/catchAsync'
 import sendResponse from '../../../shared/sendResponse'
-import { IUser } from './user.interface'
+
 import { UserServices } from './user.service'
 
-const createUser = catchAsync(async (req: Request, res: Response) => {
-  const { ...userData } = req.body
-  const user = await UserServices.createUser(userData)
-  sendResponse<IUser>(res, {
-    statusCode: StatusCodes.CREATED,
-    success: true,
-    message: 'User created successfully',
-    data: user,
-  })
-})
+
 
 const updateProfile = catchAsync(async (req: Request, res: Response) => {
   const { image, ...userData } = req.body
@@ -31,6 +22,6 @@ const updateProfile = catchAsync(async (req: Request, res: Response) => {
 })
 
 export const UserController = {
-  createUser,
+
   updateProfile,
 }

@@ -18,7 +18,7 @@ const customLogin = catchAsync(async (req: Request, res: Response) => {
 
 const forgetPassword = catchAsync(async (req: Request, res: Response) => {
   const { email, phone } = req.body
-  const result = await CustomAuthServices.forgetPassword(email, phone)
+  const result = await CustomAuthServices.forgetPassword(email.toLowerCase().trim(), phone)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -41,8 +41,8 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 
 const verifyAccount = catchAsync(async (req: Request, res: Response) => {
   const { oneTimeCode, phone, email } = req.body
-  const user = req.user
-  const result = await CustomAuthServices.verifyAccount(user!, oneTimeCode)
+
+  const result = await CustomAuthServices.verifyAccount(email, oneTimeCode)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -63,8 +63,8 @@ const getRefreshToken = catchAsync(async (req: Request, res: Response) => {
 })
 
 const resendOtp = catchAsync(async (req: Request, res: Response) => {
-  const { email, phone } = req.body
-  const result = await CustomAuthServices.resendOtp(req.user!)
+  const { email, phone, authType } = req.body
+  const result = await CustomAuthServices.resendOtp(email, authType)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -97,7 +97,17 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     data: result,
   })
 })
-
+const deleteAccount = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user
+  const {password} = req.body
+  const result = await CustomAuthServices.deleteAccount(user!, password)
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Account deleted successfully',
+    data: result,
+  })
+})
 export const CustomAuthController = {
   forgetPassword,
   resetPassword,
@@ -107,4 +117,5 @@ export const CustomAuthController = {
   resendOtp,
   changePassword,
   createUser,
+  deleteAccount
 }

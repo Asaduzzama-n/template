@@ -5,17 +5,11 @@ import validateRequest from '../../middleware/validateRequest'
 import auth from '../../middleware/auth'
 import { USER_ROLES } from '../../../enum/user'
 import {
-  fileAndBodyProcessor,
   fileAndBodyProcessorUsingDiskStorage,
 } from '../../middleware/processReqBody'
 
 const router = express.Router()
 
-router.post(
-  '/create-user',
-  validateRequest(UserValidations.createUserZodSchema),
-  UserController.createUser,
-)
 
 router.patch(
   '/profile',

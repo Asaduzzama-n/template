@@ -48,6 +48,11 @@ const auth =
 
 export default auth
 
+
+
+//this temp auth middleware is created for temporary user verification before creating a new user
+//in the future, we will use the auth middleware above
+
 export const tempAuth =
   (...roles: string[]) =>
   async (req: Request, res: Response, next: NextFunction) => {
