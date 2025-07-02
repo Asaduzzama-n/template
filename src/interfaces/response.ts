@@ -15,9 +15,10 @@ export type IRefreshTokenResponse = {
 }
 
 export type ILoginResponse = {
-  accessToken: string
-  refreshToken: string
-
+  accessToken?: string
+  refreshToken?: string
+  status?: number
+  message?: string
   nextStep?: string
   role?: string
 }

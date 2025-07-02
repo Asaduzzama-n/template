@@ -6,8 +6,8 @@ import { Notification } from './notifications.model'
 
 const getNotifications = (user: JwtPayload) => {
   const result = Notification.find({ user: user.authId })
-    .populate('receiver', 'name image')
-    .populate('sender', 'name image')
+    .populate('to', 'name image')
+    .populate('from', 'name image')
     .lean()
   return result
 }

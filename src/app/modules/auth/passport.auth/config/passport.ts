@@ -3,10 +3,11 @@ import { User } from '../../../user/user.model'
 import { Strategy as LocalStrategy } from 'passport-local'
 import { USER_ROLES, USER_STATUS } from '../../../../../enum/user'
 
-import { PassportAuthServices } from '../passport.auth.service'
-import { AuthHelper } from '../../auth.helper'
+
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
 import config from '../../../../../config'
+import ApiError from '../../../../../errors/ApiError'
+import { StatusCodes } from 'http-status-codes'
 
 passport.use(
   new LocalStrategy(
@@ -25,9 +26,10 @@ passport.use(
           .lean()
 
         if (!isUserExist) {
-          return done(null, false, {
-            message: 'No user found with this email.',
-          })
+          throw new ApiError(
+            StatusCodes.BAD_REQUEST,
+            'No account found with this email, please try with valid email or create an account.',
+          )
         }
 
         return done(null, {

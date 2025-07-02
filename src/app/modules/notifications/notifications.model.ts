@@ -3,8 +3,8 @@ import { INotification, NotificationModel } from './notifications.interface'
 
 const notificationSchema = new Schema<INotification, NotificationModel>(
   {
-    receiver: { type: Schema.Types.ObjectId, ref: 'User' },
-    sender: { type: Schema.Types.ObjectId, ref: 'User' },
+    to: { type: Schema.Types.ObjectId, ref: 'User' },
+    from: { type: Schema.Types.ObjectId, ref: 'User' },
     title: { type: String },
     body: { type: String },
     isRead: { type: Boolean },

@@ -4,7 +4,7 @@ import { FaqModel, IFaq, IPublic, PublicModel } from './public.interface'
 const publicSchema = new Schema<IPublic, PublicModel>(
   {
     content: { type: String },
-    type: { type: String, enum: ['privacy-policy', 'terms-and-condition'] },
+    type: { type: String, enum: ['privacy-policy', 'terms-and-condition','contact','about'] },
   },
   {
     timestamps: true,

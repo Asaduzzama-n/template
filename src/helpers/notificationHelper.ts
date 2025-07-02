@@ -3,15 +3,15 @@ import { logger } from '../shared/logger'
 import { socket } from '../utils/socket'
 
 export const sendNotification = async (
-  sender: string,
-  receiver: string,
+  from: string,
+  to: string,
   title: string,
   body: string,
 ) => {
   try {
     const result = await Notification.create({
-      sender,
-      receiver,
+      from,
+      to,
       title,
       body,
       isRead: false,
@@ -20,8 +20,8 @@ export const sendNotification = async (
     if (!result) logger.warn('Notification not sent')
 
     const populatedResult = (
-      await result.populate('sender', { profile: 1, name: 1 })
-    ).populate('receiver', { profile: 1, name: 1 })
+      await result.populate('from', { profile: 1, name: 1 })
+    ).populate('to', { profile: 1, name: 1 })
 
     socket.emit('notification', populatedResult)
   } catch (err) {

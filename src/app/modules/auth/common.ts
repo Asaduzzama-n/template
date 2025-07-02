@@ -4,19 +4,39 @@ import ApiError from '../../../errors/ApiError'
 import { USER_STATUS } from '../../../enum/user'
 import { User } from '../user/user.model'
 import { AuthHelper } from './auth.helper'
+import { generateOtp } from '../../../utils/crypto'
 
 const handleLoginLogic = async (payload: ILoginData, isUserExist: any) => {
   const { authentication, verified, status, password } = isUserExist
 
   const { restrictionLeftAt, wrongLoginAttempts } = authentication
 
-  console.log(verified, status, restrictionLeftAt, wrongLoginAttempts)
+
 
   if (!verified) {
-    throw new ApiError(
-      StatusCodes.UNAUTHORIZED,
-      'Your email is not verified, please verify your email and try again.',
-    )
+    //send otp to user
+    
+    const otp = generateOtp()
+    const otpExpiresIn = new Date(Date.now() + 5 * 60 * 1000)
+
+    const authentication = {
+      email: payload.email,
+      oneTimeCode: otp,
+      expiresAt: otpExpiresIn,
+      latestRequestAt: new Date(),
+      authType: 'createAccount',
+    }
+
+    await User.findByIdAndUpdate(isUserExist._id, {
+      $set: {
+        authentication,
+      },
+    })
+
+    return {
+      status: StatusCodes.PROXY_AUTHENTICATION_REQUIRED,
+      message: 'Your email is not verified, please verify your email and try again.',
+    }
   }
 
   if (status === USER_STATUS.DELETED) {
@@ -91,8 +111,14 @@ const handleLoginLogic = async (payload: ILoginData, isUserExist: any) => {
     { new: true },
   )
 
-  const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role)
-  return tokens
+  const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name, isUserExist.email)
+  return {
+    status: StatusCodes.OK,
+    message: `Welcome back ${isUserExist.name}`,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    role: isUserExist.role,
+  }
 }
 
 export const AuthCommonServices = {

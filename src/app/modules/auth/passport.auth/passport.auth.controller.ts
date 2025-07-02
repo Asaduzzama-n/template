@@ -17,9 +17,9 @@ const login = catchAsync(async (req: Request, res: Response) => {
   )
 
   sendResponse<ILoginResponse>(res, {
-    statusCode: StatusCodes.OK,
+    statusCode: result.status,
     success: true,
-    message: 'Login successful',
+    message: result.message,
     data: result,
   })
 })

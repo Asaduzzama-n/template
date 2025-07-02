@@ -240,9 +240,13 @@ const verifyAccount = async (email:string, onetimeCode: string) => {
     const token = AuthHelper.createToken(
       isUserExist._id,
       isUserExist.role,
+      isUserExist.name,
+      isUserExist.email,
     )
 
     return {
+      status: StatusCodes.OK,
+      message: `Welcome back ${isUserExist.name}`,
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,
     }
@@ -273,7 +277,7 @@ const getRefreshToken = async (token: string) => {
 
     const { userId, role } = decodedToken
 
-    const tokens = AuthHelper.createToken(userId, role)
+    const tokens = AuthHelper.createToken(userId, role, decodedToken.name, decodedToken.email)
 
     return {
       accessToken: tokens.accessToken,
@@ -299,8 +303,13 @@ const socialLogin = async (appId: string, deviceToken: string) => {
     })
     if (!createdUser)
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user.')
-    const tokens = AuthHelper.createToken(createdUser._id, createdUser.role)
-    return tokens.accessToken
+    const tokens = AuthHelper.createToken(createdUser._id, createdUser.role, createdUser.name, createdUser.email)
+    return {
+      status: StatusCodes.OK,
+      message: `Welcome back ${createdUser.name}`,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    }
   } else {
     await User.findByIdAndUpdate(isUserExist._id, {
       $set: {
@@ -308,9 +317,14 @@ const socialLogin = async (appId: string, deviceToken: string) => {
       },
     })
 
-    const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role)
+    const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name, isUserExist.email)
     //send token to client
-    return tokens.accessToken
+    return {
+      status: StatusCodes.OK,
+      message: `Welcome back ${isUserExist.name}`,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    }
   }
 }
 
@@ -408,7 +422,11 @@ const deleteAccount = async (user: JwtPayload, password:string) => {
     $set: { status: USER_STATUS.DELETED },
   })
 
-  return 'Account deleted successfully.'
+  return {
+    status: StatusCodes.OK,
+    message: 'Account deleted successfully.',
+    deletedData,
+  }
 }
 
 const resendOtp = async (email:string, authType:'createAccount' | 'resetPassword') => {

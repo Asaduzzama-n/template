@@ -4,9 +4,7 @@ import { IUser } from './user.interface'
 import { User } from './user.model'
 
 import { USER_ROLES, USER_STATUS } from '../../../enum/user'
-import { generateOtp } from '../../../utils/crypto'
-import { emailTemplate } from '../../../shared/emailTemplate'
-import { emailHelper } from '../../../helpers/emailHelper'
+
 import { JwtPayload } from 'jsonwebtoken'
 import { logger } from '../../../shared/logger'
 
