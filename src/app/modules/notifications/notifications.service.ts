@@ -21,7 +21,13 @@ const readNotification = async (id: string) => {
   return result
 }
 
+const readAllNotifications = (user: JwtPayload) => {
+  const result = Notification.updateMany({ user: user.authId }, { isRead: true })
+  return result
+}
+
 export const NotificationServices = {
   getNotifications,
   readNotification,
+  readAllNotifications,
 }

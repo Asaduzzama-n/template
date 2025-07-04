@@ -9,6 +9,7 @@ export default {
   node_env: process.env.NODE_ENV,
   port: process.env.PORT,
   bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
+  firebase_service_account_base64: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
   google: {
     client_id: process.env.GOOGLE_CLIENT_ID,
     client_secret: process.env.GOOGLE_CLIENT_SECRET,

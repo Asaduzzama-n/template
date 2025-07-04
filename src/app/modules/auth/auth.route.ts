@@ -1,7 +1,6 @@
 import express from 'express'
 import passport from 'passport'
 import { PassportAuthController } from './passport.auth/passport.auth.controller'
-
 import { CustomAuthController } from './custom.auth/custom.auth.controller'
 import validateRequest from '../../middleware/validateRequest'
 import { AuthValidations } from './auth.validation'

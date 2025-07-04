@@ -234,25 +234,43 @@ const verifyAccount = async (email:string, onetimeCode: string) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid OTP, please try again.')
   }
 
+  const currentDate = new Date()
+  if (authentication?.expiresAt! < currentDate) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'OTP has expired, please try again.',
+    )
+  }
+
 
   //either newly created user or existing user
-  if (authentication?.authType === 'createAccount') {
-    const token = AuthHelper.createToken(
+  if (!isUserExist.verified) {
+    await User.findByIdAndUpdate(
+      isUserExist._id,
+      { $set: { verified: true } },
+      { new: true },
+    )
+
+   return {
+    status: StatusCodes.OK,
+    message: `Welcome ${isUserExist.name} to our platform.`,
+    token: AuthHelper.createToken(
       isUserExist._id,
       isUserExist.role,
       isUserExist.name,
       isUserExist.email,
+    ),
+    role: isUserExist.role,
+   }
+  }else{
+
+    await User.findByIdAndUpdate(
+      isUserExist._id,
+      { $set: { authentication: { oneTimeCode: '', expiresAt: null, latestRequestAt: null, requestCount: 0, authType: '', resetPassword: true } } },
+      { new: true },
     )
 
-    return {
-      status: StatusCodes.OK,
-      message: `Welcome back ${isUserExist.name}`,
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
-    }
-  }else if(authentication?.authType === 'resetPassword'){
     const token = await Token.create({
-
       token: cryptoToken(),
       user: isUserExist._id,
       expireAt: new Date(Date.now() + 5 * 60 * 1000), // 15 minutes
@@ -261,10 +279,13 @@ const verifyAccount = async (email:string, onetimeCode: string) => {
     if(!token){
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Something went wrong, please try again. or contact support.')
     }
-    return token.token
+    return {
+      status: StatusCodes.OK,
+      message: 'OTP verified successfully, please reset your password.',
+      token: token.token,
+      role: isUserExist.role,
+    }
   }
-
-
 
 }
 
@@ -309,6 +330,7 @@ const socialLogin = async (appId: string, deviceToken: string) => {
       message: `Welcome back ${createdUser.name}`,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      role: createdUser.role,
     }
   } else {
     await User.findByIdAndUpdate(isUserExist._id, {
@@ -324,12 +346,13 @@ const socialLogin = async (appId: string, deviceToken: string) => {
       message: `Welcome back ${isUserExist.name}`,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      role: isUserExist.role,
     }
   }
 }
 
 const resendOtpToPhoneOrEmail = async (
-  type: 'verify' | 'reset',
+  authType: 'resetPassword' | 'createAccount',
   email?: string,
   phone?: string,
 ) => {
@@ -367,7 +390,7 @@ const resendOtpToPhoneOrEmail = async (
       email: isUserExist.email as string,
       name: isUserExist.name as string,
       otp,
-      type,
+      type:authType,
     })
     emailHelper.sendEmail(forgetPasswordEmailTemplate)
 
@@ -473,7 +496,7 @@ const resendOtp = async (email:string, authType:'createAccount' | 'resetPassword
       email: email as string,
       name: isUserExist.name as string,
       otp,
-      type: 'verify',
+      type: authType,
     })
     emailHelper.sendEmail(forgetPasswordEmailTemplate)
   }
@@ -505,7 +528,7 @@ const changePassword = async (
 
   if (!isPasswordMatch) {
     throw new ApiError(
-      StatusCodes.UNAUTHORIZED,
+      StatusCodes.BAD_REQUEST,
       'Current password is incorrect',
     )
   }

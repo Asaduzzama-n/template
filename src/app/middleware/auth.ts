@@ -38,7 +38,10 @@ const auth =
 
           next()
         } catch (error) {
-          throw new ApiError(StatusCodes.UNAUTHORIZED, 'You are not authorized')
+          if (error instanceof Error && error.name === 'TokenExpiredError') {
+            throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
+          }
+          throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
         }
       }
     } catch (error) {
@@ -86,7 +89,10 @@ export const tempAuth =
 
           next()
         } catch (error) {
-          throw new ApiError(StatusCodes.UNAUTHORIZED, 'You are not authorized')
+          if (error instanceof Error && error.name === 'TokenExpiredError') {
+            throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
+          }
+          throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
         }
       }
     } catch (error) {

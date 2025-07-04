@@ -9,7 +9,7 @@ const customLogin = catchAsync(async (req: Request, res: Response) => {
 
   const result = await CustomAuthServices.customLogin(loginData)
   const {status, message, accessToken, refreshToken, role} = result
-  console.log(result)
+
   sendResponse(res, {
     statusCode: status,
     success: true,

@@ -24,7 +24,18 @@ const updateNotification = catchAsync(async (req: Request, res: Response) => {
   })
 })
 
+const updateAllNotifications = catchAsync(async (req: Request, res: Response) => {
+  const result = await NotificationServices.readAllNotifications(req.user!)
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Notifications updated successfully',
+    data: result,
+  })
+})
+
 export const NotificationController = {
   getMyNotifications,
   updateNotification,
+  updateAllNotifications,
 }

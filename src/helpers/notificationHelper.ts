@@ -1,12 +1,14 @@
 import { Notification } from '../app/modules/notifications/notifications.model'
 import { logger } from '../shared/logger'
 import { socket } from '../utils/socket'
+import { sendPushNotification } from './pushnotificationHelper'
 
 export const sendNotification = async (
   from: string,
   to: string,
   title: string,
   body: string,
+  deviceToken?: string,
 ) => {
   try {
     const result = await Notification.create({
@@ -24,6 +26,10 @@ export const sendNotification = async (
     ).populate('to', { profile: 1, name: 1 })
 
     socket.emit('notification', populatedResult)
+
+    if(deviceToken){
+     await sendPushNotification(deviceToken, title, body, { from, to })
+    }
   } catch (err) {
     //@ts-ignore
     logger.error(err, 'FROM NOTIFICATION HELPER')

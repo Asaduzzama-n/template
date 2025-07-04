@@ -73,9 +73,9 @@ const resendOtp = (values: {
   email: string
   name: string
   otp: string
-  type: 'reset' | 'verify'
+  type: 'resetPassword' | 'createAccount'
 }) => {
-  const isReset = values.type === 'reset'
+  const isReset = values.type === 'resetPassword'
   const data = {
     to: values.email,
     subject: `${isReset ? 'Password Reset' : 'Account Verification'} - New Code`,
