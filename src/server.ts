@@ -8,7 +8,8 @@ import { errorLogger, logger } from './shared/logger'
 import { socketHelper } from './helpers/socketHelper'
 import { jwtHelper } from './helpers/jwtHelper'
 import { UserServices } from './app/modules/user/user.service'
-
+import { redisClient } from './helpers/redis'
+import { createAdapter } from "@socket.io/redis-adapter";
 //uncaught exception
 process.on('uncaughtException', error => {
   errorLogger.error('UnhandledException Detected', error)
@@ -42,32 +43,19 @@ async function main() {
     //create admin user
     await UserServices.createAdmin()
 
+    
+    const pubClient = redisClient
+    const subClient = pubClient.duplicate()
+    logger.info(colors.green('🍁 Redis connected successfully'))
+
+    io.adapter(createAdapter(pubClient, subClient))
     socketHelper.socket(io)
     //@ts-ignore
     global.io = io
 
-    io.on('connection', socket => {
-      logger.info(`⚡ User Connected: ${socket.id}`)
-
-      socket.on('authenticate', (token: string) => {
-        try {
-          const { id } = jwtHelper.verifyToken(
-            token,
-            config.jwt.jwt_secret as string,
-          )
-          onlineUsers.set(socket.id, id)
-          console.log('user id', id)
-        } catch (error) {
-          logger.error(error)
-        }
-      })
-
-      socket.on('disconnect', () => {
-        logger.info(`⚡ User Disconnected: ${socket.id}`)
-      })
-    })
   } catch (error) {
     errorLogger.error(colors.red('🤢 Failed to connect Database'))
+    config.node_env === 'development' && console.log(error)
   }
 
   //handle unhandleRejection
