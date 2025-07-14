@@ -2,7 +2,7 @@ import { StatusCodes } from 'http-status-codes'
 import { User } from '../../user/user.model'
 import { AuthHelper } from '../auth.helper'
 import ApiError from '../../../../errors/ApiError'
-import { USER_STATUS } from '../../../../enum/user'
+import { USER_ROLES, USER_STATUS } from '../../../../enum/user'
 import config from '../../../../config'
 import { Token } from '../../token/token.model'
 import { IResetPassword } from '../auth.interface'
@@ -65,6 +65,8 @@ const createUser = async (payload: IUser) => {
   return "Account created successfully."
 }
 
+
+
 const customLogin = async (payload: ILoginData) => {
   const { email, phone } = payload
   const query = email ? { email: email.toLowerCase().trim() } : { phone: phone }
@@ -86,6 +88,54 @@ const customLogin = async (payload: ILoginData) => {
 
   return result
 }
+
+
+const adminLogin = async (payload: ILoginData) => {
+  const { email, phone } = payload
+  const query = email ? { email: email.trim().toLowerCase() } : { phone: phone }
+
+  const isUserExist = await User.findOne({
+    ...query
+  })
+    .select('+password +authentication')
+    .lean()
+  if (!isUserExist) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `No account found with this ${email ? 'email' : 'phone'}`,
+    )
+  }
+
+  if (isUserExist.role !== USER_ROLES.ADMIN) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'You are not authorized to login as admin',
+    )
+  }
+
+  const isPasswordMatch = await AuthHelper.isPasswordMatched(
+    payload.password,
+    isUserExist.password as string,
+  )
+  if (!isPasswordMatch) {
+    throw new ApiError(
+      StatusCodes.UNAUTHORIZED,
+      'Please try again with correct credentials.',
+    )
+  }
+  
+  //tokens 
+  const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name!, isUserExist.email!, isUserExist.deviceToken)
+
+  return {
+    status: StatusCodes.OK,
+    message: `Welcome back ${isUserExist.name}`,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    role: isUserExist.role,
+  }
+}
+
 
 const forgetPassword = async (email?: string, phone?: string) => {
   const query = email ? { email: email.toLocaleLowerCase().trim() } : { phone: phone }
@@ -550,6 +600,7 @@ const changePassword = async (
 }
 
 export const CustomAuthServices = {
+  adminLogin,
   forgetPassword,
   resetPassword,
   verifyAccount,

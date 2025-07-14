@@ -18,6 +18,20 @@ const customLogin = catchAsync(async (req: Request, res: Response) => {
   })
 })
 
+const adminLogin = catchAsync(async (req: Request, res: Response) => {
+  const { ...loginData } = req.body
+
+  const result = await CustomAuthServices.adminLogin(loginData)
+  const {status, message, accessToken, refreshToken, role} = result
+
+  sendResponse(res, {
+    statusCode: status,
+    success: true,
+    message: message,
+    data: {accessToken, refreshToken, role},
+  })
+})
+
 const forgetPassword = catchAsync(async (req: Request, res: Response) => {
   const { email, phone } = req.body
   const result = await CustomAuthServices.forgetPassword(email.toLowerCase().trim(), phone)
@@ -119,5 +133,6 @@ export const CustomAuthController = {
   resendOtp,
   changePassword,
   createUser,
-  deleteAccount
+  deleteAccount,
+  adminLogin
 }

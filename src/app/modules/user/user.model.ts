@@ -38,6 +38,20 @@ const userSchema = new Schema<IUser, UserModel>(
       type: String,
       default: USER_ROLES.USER,
     },
+    address: {
+      type: String,
+    },
+    location: {
+      type: {
+        type: String,
+        default: 'Point',
+        enum: ['Point'],
+      },
+      coordinates: {
+        type: [Number],
+        default: [0.0, 0.0], // [longitude, latitude]
+      },
+    },
     appId: {
       type: String,
     },
@@ -91,6 +105,8 @@ const userSchema = new Schema<IUser, UserModel>(
     timestamps: true,
   },
 )
+
+userSchema.index({ location: '2dsphere' })
 
 userSchema.statics.isPasswordMatched = async function (
   givenPassword: string,

@@ -14,7 +14,11 @@ router.post(
   validateRequest(AuthValidations.createUserZodSchema),
   CustomAuthController.createUser,
 )
-
+router.post(
+  '/admin-login',
+  validateRequest(AuthValidations.loginZodSchema),
+  CustomAuthController.adminLogin,
+)
 router.post(
   '/login',
   validateRequest(AuthValidations.loginZodSchema),

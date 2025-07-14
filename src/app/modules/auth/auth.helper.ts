@@ -4,14 +4,14 @@ import config from '../../../config'
 import { Types } from 'mongoose'
 import bcrypt from 'bcrypt'
 
-const createToken = (authId: Types.ObjectId, role: string, name?: string, email?: string) => {
+const createToken = (authId: Types.ObjectId, role: string, name?: string, email?: string, deviceToken?: string) => {
   const accessToken = jwtHelper.createToken(
-    { authId, role, name, email },
+    { authId, role, name, email, deviceToken },
     config.jwt.jwt_secret as Secret,
     config.jwt.jwt_expire_in as string,
   )
   const refreshToken = jwtHelper.createToken(
-    { authId, role, name, email },
+    { authId, role, name, email, deviceToken },
     config.jwt.jwt_refresh_secret as Secret,
     config.jwt.jwt_refresh_expire_in as string,
   )
