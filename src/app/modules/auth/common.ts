@@ -9,6 +9,7 @@ import { IAuthResponse } from './auth.interface'
 import { IUser } from '../user/user.interface'
 import { emailTemplate } from '../../../shared/emailTemplate'
 import { emailHelper } from '../../../helpers/emailHelper'
+import { emailQueue } from '../../../helpers/bull-mq-producer'
 
 const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise<IAuthResponse> => {
   const { authentication, verified, status, password } = isUserExist
@@ -43,7 +44,7 @@ const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise
       otp,
     })
 
-    emailHelper.sendEmail(otpTemplate)
+    emailQueue.add('emails', otpTemplate)
 
     return authResponse(StatusCodes.PROXY_AUTHENTICATION_REQUIRED, `An OTP has been sent to your ${payload.email}. Please verify.`)
 

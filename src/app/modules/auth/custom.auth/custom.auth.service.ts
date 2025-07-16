@@ -6,7 +6,6 @@ import { USER_ROLES, USER_STATUS } from '../../../../enum/user'
 import config from '../../../../config'
 import { Token } from '../../token/token.model'
 import { IAuthResponse, IResetPassword } from '../auth.interface'
-import { emailHelper } from '../../../../helpers/emailHelper'
 import { emailTemplate } from '../../../../shared/emailTemplate'
 import cryptoToken, { generateOtp } from '../../../../utils/crypto'
 import bcrypt from 'bcrypt'
@@ -15,6 +14,7 @@ import { AuthCommonServices, authResponse } from '../common'
 import { jwtHelper } from '../../../../helpers/jwtHelper'
 import { JwtPayload } from 'jsonwebtoken'
 import { IUser } from '../../user/user.interface'
+import { emailQueue } from '../../../../helpers/bull-mq-producer'
 
 
 const createUser = async (payload: IUser) => {
@@ -60,7 +60,7 @@ const createUser = async (payload: IUser) => {
   if(!user){
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user.')
   }
-  emailHelper.sendEmail(createAccount)
+  emailQueue.add('emails', createAccount)
 
   return "Account created successfully."
 }
@@ -179,7 +179,7 @@ const forgetPassword = async (email?: string, phone?: string) => {
       email: isUserExist.email as string,
       otp,
     })
-    emailHelper.sendEmail(forgetPasswordEmailTemplate)
+    emailQueue.add('emails', forgetPasswordEmailTemplate)
   }
 
   return "OTP sent successfully."
@@ -412,7 +412,7 @@ const resendOtpToPhoneOrEmail = async (
       otp,
       type:authType,
     })
-    emailHelper.sendEmail(forgetPasswordEmailTemplate)
+    emailQueue.add('emails', forgetPasswordEmailTemplate)
 
     await User.findByIdAndUpdate(
       isUserExist._id,
@@ -518,7 +518,7 @@ const resendOtp = async (email:string, authType:'createAccount' | 'resetPassword
       otp,
       type: authType,
     })
-    emailHelper.sendEmail(forgetPasswordEmailTemplate)
+    emailQueue.add('emails', forgetPasswordEmailTemplate)
   }
 
   

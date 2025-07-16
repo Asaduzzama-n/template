@@ -6,10 +6,10 @@ import config from './config'
 
 import { errorLogger, logger } from './shared/logger'
 import { socketHelper } from './helpers/socketHelper'
-import { jwtHelper } from './helpers/jwtHelper'
 import { UserServices } from './app/modules/user/user.service'
 import { redisClient } from './helpers/redis'
 import { createAdapter } from "@socket.io/redis-adapter";
+import { emailWorker, notificationWorker } from './helpers/bull-mq-worker'
 //uncaught exception
 process.on('uncaughtException', error => {
   errorLogger.error('UnhandledException Detected', error)
@@ -42,7 +42,9 @@ async function main() {
 
     //create admin user
     await UserServices.createAdmin()
-
+    //bull mq notification worker!!!!!
+    notificationWorker
+    emailWorker
     
     const pubClient = redisClient
     const subClient = pubClient.duplicate()
