@@ -59,11 +59,12 @@ const verifyAccount = catchAsync(async (req: Request, res: Response) => {
   const { oneTimeCode, phone, email } = req.body
 
   const result = await CustomAuthServices.verifyAccount(email, oneTimeCode)
+  const {status, message, accessToken, refreshToken, role} = result
   sendResponse(res, {
-    statusCode: StatusCodes.OK,
+    statusCode: status,
     success: true,
-    message: 'Account verified successfully, please login now.',
-    data: result,
+    message: message,
+    data: {accessToken, refreshToken, role},
   })
 })
 
@@ -124,6 +125,19 @@ const deleteAccount = catchAsync(async (req: Request, res: Response) => {
     data: result,
   })
 })
+
+
+const socialLogin = catchAsync(async (req: Request, res: Response) => {
+  const { appId, deviceToken } = req.body
+  const result = await CustomAuthServices.socialLogin(appId, deviceToken)
+  const {status, message, accessToken, refreshToken, role} = result
+  sendResponse(res, {
+    statusCode: status,
+    success: true,
+    message: message,
+    data: {accessToken, refreshToken, role},
+  })
+})
 export const CustomAuthController = {
   forgetPassword,
   resetPassword,
@@ -134,5 +148,6 @@ export const CustomAuthController = {
   changePassword,
   createUser,
   deleteAccount,
-  adminLogin
+  adminLogin,
+  socialLogin
 }

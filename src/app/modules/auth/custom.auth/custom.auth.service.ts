@@ -5,13 +5,13 @@ import ApiError from '../../../../errors/ApiError'
 import { USER_ROLES, USER_STATUS } from '../../../../enum/user'
 import config from '../../../../config'
 import { Token } from '../../token/token.model'
-import { IResetPassword } from '../auth.interface'
+import { IAuthResponse, IResetPassword } from '../auth.interface'
 import { emailHelper } from '../../../../helpers/emailHelper'
 import { emailTemplate } from '../../../../shared/emailTemplate'
 import cryptoToken, { generateOtp } from '../../../../utils/crypto'
 import bcrypt from 'bcrypt'
 import { ILoginData } from '../../../../interfaces/auth'
-import { AuthCommonServices } from '../common'
+import { AuthCommonServices, authResponse } from '../common'
 import { jwtHelper } from '../../../../helpers/jwtHelper'
 import { JwtPayload } from 'jsonwebtoken'
 import { IUser } from '../../user/user.interface'
@@ -67,7 +67,7 @@ const createUser = async (payload: IUser) => {
 
 
 
-const customLogin = async (payload: ILoginData) => {
+const customLogin = async (payload: ILoginData):Promise<IAuthResponse> => {
   const { email, phone } = payload
   const query = email ? { email: email.toLowerCase().trim() } : { phone: phone }
 
@@ -90,7 +90,7 @@ const customLogin = async (payload: ILoginData) => {
 }
 
 
-const adminLogin = async (payload: ILoginData) => {
+const adminLogin = async (payload: ILoginData):Promise<IAuthResponse> => {
   const { email, phone } = payload
   const query = email ? { email: email.trim().toLowerCase() } : { phone: phone }
 
@@ -125,15 +125,9 @@ const adminLogin = async (payload: ILoginData) => {
   }
   
   //tokens 
-  const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name!, isUserExist.email!, isUserExist.deviceToken)
+  const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name!, isUserExist.email!)
 
-  return {
-    status: StatusCodes.OK,
-    message: `Welcome back ${isUserExist.name}`,
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-    role: isUserExist.role,
-  }
+  return authResponse(StatusCodes.OK, `Welcome back ${isUserExist.name}`, isUserExist.role, tokens.accessToken, tokens.refreshToken)
 }
 
 
@@ -259,7 +253,7 @@ const resetPassword = async (resetToken: string, payload: IResetPassword) => {
   return { message: 'Password reset successfully' }
 }
 
-const verifyAccount = async (email:string, onetimeCode: string) => {
+const verifyAccount = async (email:string, onetimeCode: string):Promise<IAuthResponse> => {
   //verify fo new user
   if (!onetimeCode) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP is required.')
@@ -301,17 +295,8 @@ const verifyAccount = async (email:string, onetimeCode: string) => {
       { new: true },
     )
 
-   return {
-    status: StatusCodes.OK,
-    message: `Welcome ${isUserExist.name} to our platform.`,
-    token: AuthHelper.createToken(
-      isUserExist._id,
-      isUserExist.role,
-      isUserExist.name,
-      isUserExist.email,
-    ),
-    role: isUserExist.role,
-   }
+    const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name, isUserExist.email )
+   return authResponse(StatusCodes.OK, `Welcome ${isUserExist.name} to our platform.`, isUserExist.role, tokens.accessToken, tokens.refreshToken)
   }else{
 
     await User.findByIdAndUpdate(
@@ -329,12 +314,9 @@ const verifyAccount = async (email:string, onetimeCode: string) => {
     if(!token){
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Something went wrong, please try again. or contact support.')
     }
-    return {
-      status: StatusCodes.OK,
-      message: 'OTP verified successfully, please reset your password.',
-      token: token.token,
-      role: isUserExist.role,
-    }
+    
+
+    return authResponse(StatusCodes.OK, 'OTP verified successfully, please reset your password.', isUserExist.role,undefined,undefined, token.token)
   }
 
 }
@@ -361,7 +343,7 @@ const getRefreshToken = async (token: string) => {
   }
 }
 
-const socialLogin = async (appId: string, deviceToken: string) => {
+const socialLogin = async (appId: string, deviceToken: string):Promise<IAuthResponse> => {
   const isUserExist = await User.findOne({
     appId,
     status: { $in: [USER_STATUS.ACTIVE, USER_STATUS.RESTRICTED] },
@@ -375,13 +357,7 @@ const socialLogin = async (appId: string, deviceToken: string) => {
     if (!createdUser)
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user.')
     const tokens = AuthHelper.createToken(createdUser._id, createdUser.role, createdUser.name, createdUser.email)
-    return {
-      status: StatusCodes.OK,
-      message: `Welcome back ${createdUser.name}`,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      role: createdUser.role,
-    }
+    return authResponse(StatusCodes.OK, `Welcome ${createdUser.name} to our platform.`, createdUser.role, tokens.accessToken, tokens.refreshToken)
   } else {
     await User.findByIdAndUpdate(isUserExist._id, {
       $set: {
@@ -391,13 +367,7 @@ const socialLogin = async (appId: string, deviceToken: string) => {
 
     const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name, isUserExist.email)
     //send token to client
-    return {
-      status: StatusCodes.OK,
-      message: `Welcome back ${isUserExist.name}`,
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      role: isUserExist.role,
-    }
+    return authResponse(StatusCodes.OK, `Welcome back ${isUserExist.name}`, isUserExist.role, tokens.accessToken, tokens.refreshToken)
   }
 }
 

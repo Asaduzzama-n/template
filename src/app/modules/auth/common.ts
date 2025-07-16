@@ -5,8 +5,12 @@ import { USER_STATUS } from '../../../enum/user'
 import { User } from '../user/user.model'
 import { AuthHelper } from './auth.helper'
 import { generateOtp } from '../../../utils/crypto'
+import { IAuthResponse } from './auth.interface'
+import { IUser } from '../user/user.interface'
+import { emailTemplate } from '../../../shared/emailTemplate'
+import { emailHelper } from '../../../helpers/emailHelper'
 
-const handleLoginLogic = async (payload: ILoginData, isUserExist: any) => {
+const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise<IAuthResponse> => {
   const { authentication, verified, status, password } = isUserExist
 
   const { restrictionLeftAt, wrongLoginAttempts } = authentication
@@ -33,10 +37,16 @@ const handleLoginLogic = async (payload: ILoginData, isUserExist: any) => {
       },
     })
 
-    return {
-      status: StatusCodes.PROXY_AUTHENTICATION_REQUIRED,
-      message: 'Your email is not verified, please verify your email and try again.',
-    }
+    const otpTemplate = emailTemplate.createAccount({
+      name: isUserExist.name!,
+      email: isUserExist.email!,
+      otp,
+    })
+
+    emailHelper.sendEmail(otpTemplate)
+
+    return authResponse(StatusCodes.PROXY_AUTHENTICATION_REQUIRED, `An OTP has been sent to your ${payload.email}. Please verify.`)
+
   }
 
   if (status === USER_STATUS.DELETED) {
@@ -112,15 +122,23 @@ const handleLoginLogic = async (payload: ILoginData, isUserExist: any) => {
   )
 
   const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name, isUserExist.email)
-  return {
-    status: StatusCodes.OK,
-    message: `Welcome back ${isUserExist.name}`,
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-    role: isUserExist.role,
-  }
+
+  return authResponse(StatusCodes.OK, `Welcome back ${isUserExist.name}`, isUserExist.role, tokens.accessToken, tokens.refreshToken)
 }
 
 export const AuthCommonServices = {
   handleLoginLogic,
+}
+
+
+
+export const authResponse = (status: number, message: string,role?: string, accessToken?: string, refreshToken?: string, token?: string): IAuthResponse => {
+  return {
+    status,
+    message,
+    ...(role && { role }),
+    ...(accessToken && { accessToken }),
+    ...(refreshToken && { refreshToken }),
+    ...(token && { token }),
+  }
 }

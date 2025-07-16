@@ -19,9 +19,9 @@ const createToken = (authId: Types.ObjectId, role: string, name?: string, email?
   return { accessToken, refreshToken }
 }
 
-const tempAccessToken = (authId: Types.ObjectId, role: string, name?: string, email?: string) => {
+const tempAccessToken = (authId: Types.ObjectId, role: string, name?: string, email?: string, deviceToken?: string) => {
   const accessToken = jwtHelper.createToken(
-    { authId, role, name, email },
+    { authId, role, name, email, deviceToken },
     'asjdhashd#$uaas98',
     config.jwt.jwt_expire_in as string,
   )

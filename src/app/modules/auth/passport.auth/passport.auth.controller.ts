@@ -15,12 +15,13 @@ const login = catchAsync(async (req: Request, res: Response) => {
     { deviceToken: deviceToken, password: password },
     user as IUser,
   )
+  const {status, message, accessToken, refreshToken, role} = result
 
   sendResponse<ILoginResponse>(res, {
-    statusCode: result.status,
+    statusCode: status,
     success: true,
-    message: result.message,
-    data: result,
+    message: message,
+    data: {accessToken, refreshToken, role},
   })
 })
 
@@ -28,11 +29,12 @@ const googleAuthCallback = catchAsync(async (req: Request, res: Response) => {
   const result = await PassportAuthServices.handleGoogleLogin(
     req.user as IUser & { profile: any },
   )
+  const {status, message, accessToken, refreshToken, role} = result
   sendResponse(res, {
-    statusCode: StatusCodes.OK,
+    statusCode: status,
     success: true,
-    message: 'Login successful',
-    data: result,
+    message: message,
+    data: {accessToken, refreshToken, role},
   })
 })
 
