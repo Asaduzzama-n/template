@@ -7,6 +7,7 @@ import { User } from '../user/user.model'
 import { emailHelper } from '../../../helpers/emailHelper'
 import { redisClient } from '../../../helpers/redis'
 import { RedisKeys } from '../../../enum/redis.keys'
+import { emailQueue } from '../../../helpers/bull-mq-producer'
 
 
 const createPublic = async (payload: IPublic) => {
@@ -90,7 +91,7 @@ const createContact = async (payload: IContact) => {
       `,
     }
 
-    emailHelper.sendEmail(emailData)
+    emailQueue.add('emails', emailData)
 
     // Send confirmation email to the user
     const userEmailData = {
@@ -106,7 +107,7 @@ const createContact = async (payload: IContact) => {
       `,
     }
 
-    emailHelper.sendEmail(userEmailData)
+    emailQueue.add('emails', userEmailData)
 
     return {
       message: 'Contact form submitted successfully',
