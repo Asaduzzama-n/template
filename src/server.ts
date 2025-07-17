@@ -42,12 +42,15 @@ async function main() {
 
     //create admin user
     await UserServices.createAdmin()
+
     //bull mq notification worker!!!!!
     notificationWorker
     emailWorker
     
     const pubClient = redisClient
     const subClient = pubClient.duplicate()
+    
+
     logger.info(colors.green('🍁 Redis connected successfully'))
 
     io.adapter(createAdapter(pubClient, subClient))
@@ -76,7 +79,9 @@ async function main() {
 main()
 
 //SIGTERM
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
+  await notificationWorker.close();
+  await emailWorker.close();
   logger.info('SIGTERM IS RECEIVE')
   if (server) {
     server.close()

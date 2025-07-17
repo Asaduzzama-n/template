@@ -2,6 +2,7 @@ import { Queue } from "bullmq";
 import { redisClient } from "./redis";
 
 
+
 export const notificationQueue = new Queue('notifications', {
   connection: redisClient
 })

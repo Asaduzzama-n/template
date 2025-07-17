@@ -5,7 +5,8 @@ import { logger } from '../shared/logger';
 import { emailHelper } from './emailHelper';
 import { redisClient } from './redis';
 
-const connection = redisClient;
+
+
 
 export const notificationWorker = new Worker(
   'notifications',
@@ -20,7 +21,7 @@ export const notificationWorker = new Worker(
     }
   },
   {
-    connection,
+    connection:redisClient,
     autorun: true,
     
   }
@@ -39,7 +40,7 @@ export const emailWorker = new Worker(
     }
   },
   {
-    connection,
+    connection:redisClient,
     autorun: true,
     
   }
