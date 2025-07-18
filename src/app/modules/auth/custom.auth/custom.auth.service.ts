@@ -316,7 +316,7 @@ const verifyAccount = async (email:string, onetimeCode: string):Promise<IAuthRes
     }
     
 
-    return authResponse(StatusCodes.OK, 'OTP verified successfully, please reset your password.', isUserExist.role,undefined,undefined, token.token)
+    return authResponse(StatusCodes.OK, 'OTP verified successfully, please reset your password.', undefined,undefined,undefined, token.token)
   }
 
 }
