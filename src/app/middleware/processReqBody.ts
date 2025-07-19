@@ -6,16 +6,16 @@ import path from 'path'
 import fs from 'fs'
 import sharp from 'sharp'
 
-type IFolderName = 'image' | 'media' | 'doc'
+type IFolderName = 'images' | 'media' | 'documents'
 interface ProcessedFiles {
   [key: string]: string | string[] | undefined
 }
 
 // Define upload configuration with maxCount information
 const uploadFields = [
-  { name: 'image', maxCount: 5 },
+  { name: 'images', maxCount: 5 },
   { name: 'media', maxCount: 3 },
-  { name: 'doc', maxCount: 3 },
+  { name: 'documents', maxCount: 3 },
 ] as const
 
 export const fileAndBodyProcessor = () => {
@@ -29,9 +29,9 @@ export const fileAndBodyProcessor = () => {
   ) => {
     try {
       const allowedTypes = {
-        image: ['image/jpeg', 'image/png', 'image/jpg'],
+        images: ['image/jpeg', 'image/png', 'image/jpg'],
         media: ['video/mp4', 'audio/mpeg'],
-        doc: ['application/pdf'],
+        documents: ['application/pdf'],
       }
 
       const fieldType = file.fieldname as IFolderName
@@ -171,9 +171,9 @@ export const fileAndBodyProcessorUsingDiskStorage = () => {
   ) => {
     try {
       const allowedTypes = {
-        image: ['image/jpeg', 'image/png', 'image/jpg'],
+        images: ['image/jpeg', 'image/png', 'image/jpg'],
         media: ['video/mp4', 'audio/mpeg'],
-        doc: ['application/pdf'],
+        documents: ['application/pdf'],
       }
 
       const fieldType = file.fieldname as IFolderName
