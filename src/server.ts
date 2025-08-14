@@ -10,6 +10,7 @@ import { UserServices } from './app/modules/user/user.service'
 import { redisClient } from './helpers/redis'
 import { createAdapter } from "@socket.io/redis-adapter";
 import { emailWorker, notificationWorker } from './helpers/bull-mq-worker'
+import { setSocketIO } from './helpers/socketInstances'
 //uncaught exception
 process.on('uncaughtException', error => {
   errorLogger.error('UnhandledException Detected', error)
@@ -55,8 +56,8 @@ async function main() {
 
     io.adapter(createAdapter(pubClient, subClient))
     socketHelper.socket(io)
-    //@ts-ignore
-    global.io = io
+    setSocketIO(io) 
+    
 
   } catch (error) {
     errorLogger.error(colors.red('🤢 Failed to connect Database'))

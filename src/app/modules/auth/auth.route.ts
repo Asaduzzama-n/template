@@ -22,8 +22,7 @@ router.post(
 router.post(
   '/login',
   validateRequest(AuthValidations.loginZodSchema),
-  passport.authenticate('local', { session: false }),
-  PassportAuthController.login,
+  CustomAuthController.customLogin,
 )
 
 router.get(

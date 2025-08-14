@@ -1,10 +1,15 @@
+import { Types } from 'mongoose'
 import { Notification } from '../app/modules/notifications/notifications.model'
 import { logger } from '../shared/logger'
 import { socket } from '../utils/socket'
 import { sendPushNotification } from './pushnotificationHelper'
 
 export const sendNotification = async (
-  from: string,
+  from: {
+    authId: string,
+    profile?: string,
+    name?: string,
+  },
   to: string,
   title: string,
   body: string,
@@ -21,14 +26,27 @@ export const sendNotification = async (
 
     if (!result) logger.warn('Notification not sent')
 
-    const populatedResult = (
-      await result.populate('from', { profile: 1, name: 1 })
-    ).populate('to', { profile: 1, name: 1 })
+    const socketResponse = {
+      _id: result._id,
+      from: {
+        _id: from.authId,
+        name: from?.name,
+        profile: from?.profile,
+      },
+      to,
+      title,
+      body,
+      isRead: false,
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
 
-    socket.emit('notification', populatedResult)
+    }
+
+
+    socket.emit('notification', socketResponse)
 
     if(deviceToken){
-     await sendPushNotification(deviceToken, title, body, { from, to })
+     await sendPushNotification(deviceToken, title, body, { from: from.authId, to })
     }
   } catch (err) {
     //@ts-ignore
