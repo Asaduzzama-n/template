@@ -14,7 +14,8 @@ import { AuthCommonServices, authResponse } from '../common'
 import { jwtHelper } from '../../../../helpers/jwtHelper'
 import { JwtPayload } from 'jsonwebtoken'
 import { IUser } from '../../user/user.interface'
-import { emailQueue } from '../../../../helpers/bull-mq-producer'
+import { emailHelper } from '../../../../helpers/emailHelper'
+
 
 
 const createUser = async (payload: IUser) => {
@@ -60,9 +61,10 @@ const createUser = async (payload: IUser) => {
   if(!user){
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create user.')
   }
-  emailQueue.add('emails', createAccount)
+  emailHelper.sendEmail(createAccount)
 
-  return "Account created successfully."
+ return `${config.node_env === 'development' ? `${payload.email}, ${otp}` : "An otp has been sent to your email, please check."}`;
+
 }
 
 
@@ -179,10 +181,10 @@ const forgetPassword = async (email?: string, phone?: string) => {
       email: isUserExist.email as string,
       otp,
     })
-    emailQueue.add('emails', forgetPasswordEmailTemplate)
+    emailHelper.sendEmail(forgetPasswordEmailTemplate)
   }
 
-  return "OTP sent successfully."
+  return `${config.node_env === 'development' ? `${isUserExist.email}, ${otp}` : "An otp has been sent to your email, please check."}`
 }
 
 const resetPassword = async (resetToken: string, payload: IResetPassword) => {
@@ -250,7 +252,7 @@ const resetPassword = async (resetToken: string, payload: IResetPassword) => {
     { new: true },
   )
 
-  return { message: 'Password reset successfully' }
+  return { message: `Password reset successfully, please login with your new password.` }
 }
 
 const verifyAccount = async (email:string, onetimeCode: string):Promise<IAuthResponse> => {
@@ -412,7 +414,7 @@ const resendOtpToPhoneOrEmail = async (
       otp,
       type:authType,
     })
-    emailQueue.add('emails', forgetPasswordEmailTemplate)
+    emailHelper.sendEmail(forgetPasswordEmailTemplate)
 
     await User.findByIdAndUpdate(
       isUserExist._id,
@@ -434,6 +436,8 @@ const resendOtpToPhoneOrEmail = async (
       { new: true },
     )
   }
+
+  return `${config.node_env === 'development' ? `${isUserExist.email}, ${otp}` : "An otp has been sent to your email, please check."}`
 }
 
 const deleteAccount = async (user: JwtPayload, password:string) => {
@@ -518,7 +522,7 @@ const resendOtp = async (email:string, authType:'createAccount' | 'resetPassword
       otp,
       type: authType,
     })
-    emailQueue.add('emails', forgetPasswordEmailTemplate)
+    emailHelper.sendEmail(forgetPasswordEmailTemplate)
   }
 
   

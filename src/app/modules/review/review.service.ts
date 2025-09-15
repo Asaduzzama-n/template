@@ -7,7 +7,7 @@ import mongoose from 'mongoose';
 import { User } from '../user/user.model';
 import { IPaginationOptions } from '../../../interfaces/pagination';
 import { paginationHelper } from '../../../helpers/paginationHelper';
-import { redisClient } from '../../../helpers/redis';
+
 
 const createReview = async (user:JwtPayload,payload: IReview) => {
   payload.reviewer = user.authId;
@@ -58,23 +58,11 @@ const getAllReviews = async (user:JwtPayload, type:'reviewer' | 'reviewee', pagi
 
   const cacheKey = `reviews:${type}:${user.authId}:page:${page}:limit:${limit}:sort:${sortBy}:${sortOrder}`;
 
-  const cachedResult = await redisClient.get(cacheKey);
-
-  if(cachedResult){
-    return JSON.parse(cachedResult);
-  }
-
 
   const [result, total] = await Promise.all([
     Review.find({[type]:user.authId}).populate('reviewer').populate('reviewee').skip(skip).limit(limit).sort({[sortBy]:sortOrder}),
     Review.countDocuments({[type]:user.authId})
   ]);
-
-
-
-  //cache the result 
-  await redisClient.setex(cacheKey, JSON.stringify({ meta: { page, limit, total, totalPages: Math.ceil(total / limit) }, data: result }), 60 * 3); // 2 minutes
-
 
 
   return {
@@ -145,9 +133,7 @@ const updateReview = async (
     await existingReview.save({ session });
     await session.commitTransaction();
 
-    //clear the cache
-    await redisClient.del(`reviews:reviewer:${existingReview.reviewer}:*`);
-    await redisClient.del(`reviews:reviewee:${existingReview.reviewee}:*`);
+
 
     return "Review updated successfully";
   } catch (error) {
@@ -202,9 +188,7 @@ const deleteReview = async (id: string, user: JwtPayload) => {
     await existingReview.deleteOne({ session });
 
     await session.commitTransaction();
-    //clear the cache
-    await redisClient.del(`reviews:reviewer:${user.authId}:*`);
-    await redisClient.del(`reviews:reviewee:${existingReview.reviewee}:*`);
+
     return "Review deleted successfully";
   } catch (error) {
     await session.abortTransaction();

@@ -7,9 +7,8 @@ import config from './config'
 import { errorLogger, logger } from './shared/logger'
 import { socketHelper } from './helpers/socketHelper'
 import { UserServices } from './app/modules/user/user.service'
-import { redisClient } from './helpers/redis'
-import { createAdapter } from "@socket.io/redis-adapter";
-import { emailWorker, notificationWorker } from './helpers/bull-mq-worker'
+
+
 import { setSocketIO } from './helpers/socketInstances'
 //uncaught exception
 process.on('uncaughtException', error => {
@@ -44,17 +43,7 @@ async function main() {
     //create admin user
     await UserServices.createAdmin()
 
-    //bull mq notification worker!!!!!
-    notificationWorker
-    emailWorker
-    
-    const pubClient = redisClient
-    const subClient = pubClient.duplicate()
-    
 
-    logger.info(colors.green('🍁 Redis connected successfully'))
-
-    io.adapter(createAdapter(pubClient, subClient))
     socketHelper.socket(io)
     setSocketIO(io) 
     
@@ -81,8 +70,7 @@ main()
 
 //SIGTERM
 process.on('SIGTERM', async () => {
-  await notificationWorker.close();
-  await emailWorker.close();
+
   logger.info('SIGTERM IS RECEIVE')
   if (server) {
     server.close()

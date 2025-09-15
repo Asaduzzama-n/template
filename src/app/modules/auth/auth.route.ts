@@ -50,7 +50,7 @@ router.post(
 
 router.post(
   '/forget-password',
-  validateRequest(AuthValidations.resetPasswordZodSchema),
+  validateRequest(AuthValidations.forgetPasswordZodSchema),
   CustomAuthController.forgetPassword,
 )
 router.post(

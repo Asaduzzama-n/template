@@ -9,13 +9,27 @@ import { IAuthResponse } from './auth.interface'
 import { IUser } from '../user/user.interface'
 import { emailTemplate } from '../../../shared/emailTemplate'
 import { emailHelper } from '../../../helpers/emailHelper'
-import { emailQueue } from '../../../helpers/bull-mq-producer'
+
 
 const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise<IAuthResponse> => {
   const { authentication, verified, status, password } = isUserExist
 
   const { restrictionLeftAt, wrongLoginAttempts } = authentication
 
+  const isPasswordMatched = await User.isPasswordMatched(
+    payload.password,
+    password,
+  )
+
+  if (!isPasswordMatched) {
+    isUserExist.authentication.wrongLoginAttempts = wrongLoginAttempts + 1
+
+    if (isUserExist.authentication.wrongLoginAttempts >= 5) {
+      isUserExist.status = USER_STATUS.RESTRICTED
+      isUserExist.authentication.restrictionLeftAt = new Date(
+        Date.now() + 10 * 60 * 1000,
+      ) // restriction for 10 minutes
+    }
 
 
   if (!verified) {
@@ -44,7 +58,7 @@ const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise
       otp,
     })
 
-    emailQueue.add('emails', otpTemplate)
+    emailHelper.sendEmail(otpTemplate)
 
     return authResponse(StatusCodes.PROXY_AUTHENTICATION_REQUIRED, `An OTP has been sent to your ${payload.email}. Please verify.`)
 
@@ -77,20 +91,6 @@ const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise
     })
   }
 
-  const isPasswordMatched = await User.isPasswordMatched(
-    payload.password,
-    password,
-  )
-
-  if (!isPasswordMatched) {
-    isUserExist.authentication.wrongLoginAttempts = wrongLoginAttempts + 1
-
-    if (isUserExist.authentication.wrongLoginAttempts >= 5) {
-      isUserExist.status = USER_STATUS.RESTRICTED
-      isUserExist.authentication.restrictionLeftAt = new Date(
-        Date.now() + 10 * 60 * 1000,
-      ) // restriction for 10 minutes
-    }
 
     await User.findByIdAndUpdate(isUserExist._id, {
       $set: {
