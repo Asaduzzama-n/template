@@ -6,6 +6,7 @@ export type INotification = {
   from: Types.ObjectId
   title: string
   body: string
+  isAdmin?: boolean
   isRead: boolean
   createdAt: Date
   updatedAt: Date
