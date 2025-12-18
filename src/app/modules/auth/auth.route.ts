@@ -42,11 +42,7 @@ router.post(
   CustomAuthController.verifyAccount,
 )
 
-router.post(
-  '/custom-login',
-  validateRequest(AuthValidations.loginZodSchema),
-  CustomAuthController.customLogin,
-)
+
 
 router.post(
   '/forget-password',

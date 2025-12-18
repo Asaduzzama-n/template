@@ -52,4 +52,14 @@ export default {
     cloudinary_api_key: process.env.CLOUDINARY_API_KEY,
     cloudinary_secret: process.env.CLOUDINARY_SECRET,
   },
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
+  rateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+  },
+  logging: {
+    level: process.env.LOG_LEVEL || 'info',
+  },
 }

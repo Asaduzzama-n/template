@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import bcrypt from 'bcrypt'
 
 const cryptoToken = () => {
   return crypto.randomBytes(32).toString('hex')
@@ -6,15 +7,17 @@ const cryptoToken = () => {
 
 export default cryptoToken
 
-export const hashOtp = (otp: string): string => {
-  return crypto.createHash('sha256').update(otp).digest('hex')
+export const hashOtp = async (otp: string): Promise<string> => {
+  return await bcrypt.hash(otp, 10)
 }
-export const compareOtp = (otp: string, hashedOtp: string): boolean => {
-  return crypto.timingSafeEqual(
-    Buffer.from(hashOtp(otp)),
-    Buffer.from(hashedOtp),
-  )
+export const compareOtp = async (otp: string, hashedOtp: string): Promise<boolean> => {
+  return await bcrypt.compare(otp, hashedOtp)
 }
-export const generateOtp = () => {
-  return crypto.randomInt(100000, 999999).toString()
+export const generateOtp = async () => {
+  const otp = crypto.randomInt(100000, 999999).toString()
+  //return both otp and hashed otp
+  return {
+    otp,
+    hashedOtp: await hashOtp(otp),
+  }
 }

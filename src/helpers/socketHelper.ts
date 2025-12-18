@@ -1,12 +1,11 @@
 import colors from 'colors'
 import { Server, Socket } from 'socket.io'
 import { logger } from '../shared/logger'
-import { onlineUsers } from '../server'
-import { Notification } from '../app/modules/notifications/notifications.model'
 import { USER_ROLES } from '../enum/user'
 import { JwtPayload } from 'jsonwebtoken'
 import { socketMiddleware } from '../app/middleware/socketAuth'
-
+import { socketRedis } from './socketRedis'
+import { getSocketIO } from './socketInstances'
 
 // Define interface for socket with user data
 export interface SocketWithUser extends Socket {
@@ -16,6 +15,11 @@ export interface SocketWithUser extends Socket {
   }
 }
 
+/**
+ * Initialize socket server with Redis-backed user tracking
+ * 
+ * @param io - Socket.IO server instance
+ */
 const socket = (io: Server) => {
   // Apply authentication middleware to all connections
   io.use(
@@ -27,53 +31,154 @@ const socket = (io: Server) => {
     ),
   )
 
-  io.on('connection', (socket: SocketWithUser) => {
+  io.on('connection', async (socket: SocketWithUser) => {
     if (socket.user) {
-      onlineUsers.set(socket.id, socket.user.authId)
-      logger.info(colors.blue(`⚡ User ${socket.user.authId} connected`))
+      const userId = socket.user.authId
 
-      // Send notifications only on initial connection
-      // sendNotificationsToAllConnectedUsers(socket)
+      // Store socket mapping in Redis
+      await socketRedis.setUserSocket(userId, socket.id)
 
+      // Join user to their own room (for targeted emissions)
+      socket.join(userId)
+
+      logger.info(`⚡ User connected`, {
+        userId,
+        socketId: socket.id,
+        role: socket.user.role,
+      })
+
+      // Register event handlers
       registerEventHandlers(socket)
     }
   })
 }
 
-// Separate function to register all event handlers
+/**
+ * Register all socket event handlers
+ */
 const registerEventHandlers = (socket: SocketWithUser) => {
+  const userId = socket.user?.authId
 
-  // Disconnect handler
-  socket.on('disconnect', () => {
-    onlineUsers.delete(socket.id)
-    logger.info(
-      colors.red(`User ${socket.user?.authId || 'Unknown'} disconnected ⚡`),
-    )
+  // Handle disconnect
+  socket.on('disconnect', async (reason) => {
+    if (userId) {
+      // Remove socket mapping from Redis
+      await socketRedis.removeUserSocket(userId, socket.id)
+
+      logger.info(`⚡ User disconnected`, {
+        userId,
+        socketId: socket.id,
+        reason,
+      })
+    }
+  })
+
+  // Handle explicit logout (clear all sockets)
+  socket.on('logout', async () => {
+    if (userId) {
+      await socketRedis.clearUserSockets(userId)
+      logger.info(`User logged out from all devices`, { userId })
+    }
+  })
+
+  // Handle errors
+  socket.on('error', (error) => {
+    logger.error('Socket error', {
+      userId,
+      socketId: socket.id,
+      error: error.message,
+    })
   })
 }
 
-// const sendNotificationsToAllConnectedUsers = async (socket: SocketWithUser) => {
-//   try {
-//     const userId = socket.user?.authId
-//     if (!userId) return
+/**
+ * Emit event to a specific user (all their connected sockets)
+ * 
+ * @param userId - Target user ID
+ * @param event - Event name
+ * @param data - Event data
+ */
+export const emitToUser = async (
+  userId: string,
+  event: string,
+  data: any
+): Promise<boolean> => {
+  const io = getSocketIO()
+  if (!io) {
+    logger.warn('Socket.IO not initialized, skipping emit', { event, userId })
+    return false
+  }
 
-//     const [notifications, unreadCount] = await Promise.all([
-//       Notification.find({ receiver: userId }).populate([
-//         { path: 'sender', select: 'name profile' },
-//       ]).lean(),
-//       Notification.countDocuments({ receiver: userId, isRead: false }),
-//     ])
+  try {
+    // Emit to the user's room (all their sockets join their userId room)
+    io.to(userId).emit(event, data)
 
-//     socket.emit(`notification::${userId}`, {
-//       notifications,
-//       unreadCount,
-//     })
-//   } catch (error) {
-//     logger.error('Error sending notifications:', error)
-//   }
-// }
+    logger.debug('Emitted event to user', {
+      userId,
+      event,
+    })
+
+    return true
+  } catch (error: any) {
+    logger.error('Failed to emit to user', {
+      userId,
+      event,
+      error: error.message,
+    })
+    return false
+  }
+}
+
+/**
+ * Emit event to multiple users
+ * 
+ * @param userIds - Array of user IDs
+ * @param event - Event name
+ * @param data - Event data
+ */
+export const emitToUsers = async (
+  userIds: string[],
+  event: string,
+  data: any
+): Promise<void> => {
+  const io = getSocketIO()
+  if (!io) {
+    logger.warn('Socket.IO not initialized, skipping emit', { event })
+    return
+  }
+
+  userIds.forEach(userId => {
+    io.to(userId).emit(event, data)
+  })
+
+  logger.debug('Emitted event to users', {
+    userCount: userIds.length,
+    event,
+  })
+}
+
+/**
+ * Broadcast event to all connected users
+ * 
+ * @param event - Event name
+ * @param data - Event data
+ */
+export const broadcast = (event: string, data: any): boolean => {
+  const io = getSocketIO()
+  if (!io) {
+    logger.warn('Socket.IO not initialized, skipping broadcast', { event })
+    return false
+  }
+
+  io.emit(event, data)
+
+  logger.debug('Broadcast event', { event })
+  return true
+}
 
 export const socketHelper = {
   socket,
-  // sendNotificationsToAllConnectedUsers,`
+  emitToUser,
+  emitToUsers,
+  broadcast,
 }

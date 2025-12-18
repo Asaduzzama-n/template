@@ -10,95 +10,53 @@ import { IUser } from '../user/user.interface'
 import { emailTemplate } from '../../../shared/emailTemplate'
 import { emailHelper } from '../../../helpers/emailHelper'
 
+const MAX_WRONG_ATTEMPTS = 5
+const RESTRICTION_MINUTES = 10
+const OTP_EXPIRY_MINUTES = 5
 
-const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise<IAuthResponse> => {
-  const { authentication, verified, status, password } = isUserExist
+const handleLoginLogic = async (
+  payload: ILoginData,
+  user: IUser,
+): Promise<IAuthResponse> => {
+  const { password: hashedPassword, authentication, status, verified } = user
 
-  const { restrictionLeftAt, wrongLoginAttempts } = authentication
-
-  const isPasswordMatched = await User.isPasswordMatched(
-    payload.password,
-    password,
-  )
-
-  if (!isPasswordMatched) {
-    isUserExist.authentication.wrongLoginAttempts = wrongLoginAttempts + 1
-
-    if (isUserExist.authentication.wrongLoginAttempts >= 5) {
-      isUserExist.status = USER_STATUS.RESTRICTED
-      isUserExist.authentication.restrictionLeftAt = new Date(
-        Date.now() + 10 * 60 * 1000,
-      ) // restriction for 10 minutes
-    }
+  const { wrongLoginAttempts = 0, restrictionLeftAt } = authentication || {}
 
 
-  if (!verified) {
-    //send otp to user
-    
-    const otp = generateOtp()
-    const otpExpiresIn = new Date(Date.now() + 5 * 60 * 1000)
+  if (
+    status === USER_STATUS.RESTRICTED &&
+    restrictionLeftAt &&
+    new Date() < restrictionLeftAt
+  ) {
+    const remainingMinutes = Math.ceil(
+      (restrictionLeftAt.getTime() - Date.now()) / 60000,
+    )
 
-    const authentication = {
-      email: payload.email,
-      oneTimeCode: otp,
-      expiresAt: otpExpiresIn,
-      latestRequestAt: new Date(),
-      authType: 'createAccount',
-    }
-
-    await User.findByIdAndUpdate(isUserExist._id, {
-      $set: {
-        authentication,
-      },
-    })
-
-    const otpTemplate = emailTemplate.createAccount({
-      name: isUserExist.name!,
-      email: isUserExist.email!,
-      otp,
-    })
-
-    emailHelper.sendEmail(otpTemplate)
-
-    return authResponse(StatusCodes.PROXY_AUTHENTICATION_REQUIRED, `An OTP has been sent to your ${payload.email}. Please verify.`)
-
-  }
-
-  if (status === USER_STATUS.DELETED) {
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'No account found with this email',
+      StatusCodes.TOO_MANY_REQUESTS,
+      `Too many failed attempts. Try again in ${remainingMinutes} minutes.`,
     )
   }
 
-  if (status === USER_STATUS.RESTRICTED) {
-    if (restrictionLeftAt && new Date() < restrictionLeftAt) {
-      const remainingMinutes = Math.ceil(
-        (restrictionLeftAt.getTime() - Date.now()) / 60000,
-      )
-      throw new ApiError(
-        StatusCodes.TOO_MANY_REQUESTS,
-        `You are restricted to login for ${remainingMinutes} minutes`,
-      )
-    }
 
-    // Handle restriction expiration
-    await User.findByIdAndUpdate(isUserExist._id, {
+  const isPasswordMatched = await User.isPasswordMatched(
+    payload.password,
+    hashedPassword,
+  )
+
+  if (!isPasswordMatched) {
+    const attempts = wrongLoginAttempts + 1
+    const isRestricted = attempts >= MAX_WRONG_ATTEMPTS
+
+    await User.findByIdAndUpdate(user._id, {
       $set: {
-        authentication: { restrictionLeftAt: null, wrongLoginAttempts: 0 },
-        status: USER_STATUS.ACTIVE,
+        status: isRestricted ? USER_STATUS.RESTRICTED : user.status,
+        'authentication.restrictionLeftAt': isRestricted
+          ? new Date(Date.now() + RESTRICTION_MINUTES * 60 * 1000)
+          : null,
       },
-    })
-  }
-
-
-    await User.findByIdAndUpdate(isUserExist._id, {
-      $set: {
-        status: isUserExist.status,
-        authentication: {
-          restrictionLeftAt: isUserExist.authentication.restrictionLeftAt,
-          wrongLoginAttempts: isUserExist.authentication.wrongLoginAttempts,
-        },
+      $inc: {
+        'authentication.wrongLoginAttempts': 1,
       },
     })
 
@@ -108,32 +66,76 @@ const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise
     )
   }
 
+
+  if (!verified) {
+    const otp = await generateOtp()
+    const otpExpiresIn = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000)
+
+    await User.findByIdAndUpdate(user._id, {
+      $set: {
+        'authentication.oneTimeCode': otp,
+        'authentication.expiresAt': otpExpiresIn,
+        'authentication.latestRequestAt': new Date(),
+        'authentication.authType': 'loginVerification',
+      },
+    })
+
+    const otpTemplate = emailTemplate.createAccount({
+      name: user.name!,
+      email: user.email!,
+      otp: otp.otp,
+    })
+
+    await emailHelper.sendEmail(otpTemplate)
+
+    return authResponse(
+      StatusCodes.UNAUTHORIZED,
+      `An OTP has been sent to your email. Please verify to continue.`,
+    )
+  }
+
   await User.findByIdAndUpdate(
-    isUserExist._id,
+    user._id,
     {
       $set: {
-        deviceToken: payload.deviceToken,
-        authentication: {
-          restrictionLeftAt: null,
-          wrongLoginAttempts: 0,
-        },
+        status: USER_STATUS.ACTIVE,
+        'authentication.wrongLoginAttempts': 0,
+        'authentication.restrictionLeftAt': null,
+        ...(payload.deviceToken && { deviceToken: payload.deviceToken }),
       },
     },
     { new: true },
   )
 
-  const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name, isUserExist.email)
 
-  return authResponse(StatusCodes.OK, `Welcome back ${isUserExist.name}`, isUserExist.role, tokens.accessToken, tokens.refreshToken)
+  const tokens = AuthHelper.createToken(
+    user._id,
+    user.role,
+    user.name,
+    user.email,
+  )
+
+  return authResponse(
+    StatusCodes.OK,
+    `Welcome back ${user.name}`,
+    user.role,
+    tokens.accessToken,
+    tokens.refreshToken,
+  )
 }
 
 export const AuthCommonServices = {
   handleLoginLogic,
 }
 
-
-
-export const authResponse = (status: number, message: string,role?: string, accessToken?: string, refreshToken?: string, token?: string): IAuthResponse => {
+export const authResponse = (
+  status: number,
+  message: string,
+  role?: string,
+  accessToken?: string,
+  refreshToken?: string,
+  token?: string,
+): IAuthResponse => {
   return {
     status,
     message,
