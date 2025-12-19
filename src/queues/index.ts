@@ -16,10 +16,12 @@ const workers: Map<string, Worker> = new Map()
 const queueEvents: Map<string, QueueEvents> = new Map()
 
 /**
- * Create a queue with default configuration
+ * Create a queue with default configuration.
+ * Uses the dedicated BullMQ Redis client with maxRetriesPerRequest: null.
  */
 const createQueue = (name: string): Queue => {
-    const connection = redisAdapter.client
+    // Use the dedicated BullMQ client (has maxRetriesPerRequest: null)
+    const connection = redisAdapter.bullmqClient
 
     const queue = new Queue(name, {
         connection,
@@ -54,14 +56,16 @@ const createQueue = (name: string): Queue => {
 }
 
 /**
- * Create a worker with given processor
+ * Create a worker with given processor.
+ * Uses the dedicated BullMQ Redis client with maxRetriesPerRequest: null.
  */
 const createWorker = (
     name: string,
     processor: (job: Job) => Promise<any>,
     options?: { concurrency?: number; limiter?: { max: number; duration: number } }
 ): Worker => {
-    const connection = redisAdapter.client
+    // Use the dedicated BullMQ client (has maxRetriesPerRequest: null)
+    const connection = redisAdapter.bullmqClient
     const config = QUEUE_CONFIG[name as keyof typeof QUEUE_CONFIG]
 
     const workerOptions: any = {

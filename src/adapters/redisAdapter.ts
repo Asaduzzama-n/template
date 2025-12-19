@@ -3,41 +3,72 @@ import config from '../config'
 import { logger, errorLogger } from '../shared/logger'
 
 /**
- * Redis connection options with production-ready defaults.
+ * Common retry strategy for Redis connections.
+ * Implements exponential backoff with maximum retry limit.
  */
-const redisOptions = {
+const createRetryStrategy = () => (times: number) => {
+    if (times > 10) {
+        errorLogger.error('Redis max retries exceeded, giving up')
+        return null // Stop retrying
+    }
+    const delay = Math.min(times * 100, 3000)
+    logger.warn(`Redis connection retry attempt ${times}, waiting ${delay}ms`)
+    return delay
+}
+
+/**
+ * Common reconnect on error handler.
+ */
+const reconnectOnError = (err: Error) => {
+    const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT']
+    return targetErrors.some(e => err.message.includes(e))
+}
+
+/**
+ * Redis connection options for general use (rate limiting, caching, etc.)
+ * Uses maxRetriesPerRequest: 3 for resilient non-blocking operations.
+ */
+const generalRedisOptions = {
     maxRetriesPerRequest: 3,
-    retryStrategy(times: number) {
-        if (times > 10) {
-            errorLogger.error('Redis max retries exceeded, giving up')
-            return null // Stop retrying
-        }
-        const delay = Math.min(times * 100, 3000)
-        logger.warn(`Redis connection retry attempt ${times}, waiting ${delay}ms`)
-        return delay
-    },
-    reconnectOnError(err: Error) {
-        const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT']
-        return targetErrors.some(e => err.message.includes(e))
-    },
+    retryStrategy: createRetryStrategy(),
+    reconnectOnError,
     enableReadyCheck: true,
     lazyConnect: false, // Connect immediately for health checks
 }
 
 /**
+ * Redis connection options specifically for BullMQ.
+ * 
+ * IMPORTANT: BullMQ uses blocking commands (BRPOPLPUSH, BLMOVE, etc.) that can
+ * take a very long time to complete. Setting maxRetriesPerRequest to any number
+ * other than null will cause BullMQ to throw:
+ * "BullMQ: Your redis options maxRetriesPerRequest must be null."
+ * 
+ * This is required for BullMQ to handle job blocking correctly.
+ */
+const bullmqRedisOptions = {
+    maxRetriesPerRequest: null, // Required by BullMQ for blocking commands
+    retryStrategy: createRetryStrategy(),
+    reconnectOnError,
+    enableReadyCheck: true,
+    lazyConnect: false,
+}
+
+/**
  * Centralized Redis Adapter
  * 
- * Provides a single connection pool reused across:
- * - Rate limiting
- * - BullMQ job queues
- * - Socket.IO adapter
- * - Caching
+ * Provides connection pools reused across:
+ * - Rate limiting (general client)
+ * - BullMQ job queues (dedicated BullMQ client with null maxRetriesPerRequest)
+ * - Socket.IO adapter (pub/sub clients)
+ * - Caching (general client)
  * 
  * Supports graceful shutdown and health monitoring.
  */
 class RedisAdapter {
     private static instance: RedisAdapter
     private _client: RedisClient | null = null
+    private _bullmqClient: RedisClient | null = null
     private _subscriber: RedisClient | null = null
     private _publisher: RedisClient | null = null
     private _isConnected: boolean = false
@@ -65,7 +96,8 @@ class RedisAdapter {
         }
 
         try {
-            this._client = new Redis(config.redis.url, redisOptions)
+            // Create general-purpose Redis client
+            this._client = new Redis(config.redis.url, generalRedisOptions)
 
             this._client.on('connect', () => {
                 logger.info('📦 Redis client connected')
@@ -142,6 +174,24 @@ class RedisAdapter {
     }
 
     /**
+     * Get a Redis client configured for BullMQ.
+     * Creates a dedicated connection with maxRetriesPerRequest: null
+     * as required by BullMQ's blocking commands.
+     */
+    get bullmqClient(): RedisClient {
+        if (!this._bullmqClient) {
+            this._bullmqClient = new Redis(config.redis.url, bullmqRedisOptions)
+            this._bullmqClient.on('connect', () => {
+                logger.info('📦 Redis BullMQ client connected')
+            })
+            this._bullmqClient.on('error', (err) => {
+                errorLogger.error('Redis BullMQ client error', { error: err.message })
+            })
+        }
+        return this._bullmqClient
+    }
+
+    /**
      * Check if Redis is connected and healthy
      */
     get isConnected(): boolean {
@@ -162,12 +212,12 @@ class RedisAdapter {
     }
 
     /**
-     * Get Redis connection URL for BullMQ
-     * BullMQ needs the connection config, not the client
+     * Get Redis connection config for BullMQ.
+     * Returns the dedicated BullMQ client with maxRetriesPerRequest: null.
      */
     getConnectionConfig() {
         return {
-            connection: this._client,
+            connection: this.bullmqClient,
         }
     }
 
@@ -211,9 +261,18 @@ class RedisAdapter {
             )
         }
 
+        if (this._bullmqClient) {
+            closePromises.push(
+                this._bullmqClient.quit().then(() => {
+                    logger.info('Redis BullMQ client closed')
+                })
+            )
+        }
+
         await Promise.all(closePromises)
 
         this._client = null
+        this._bullmqClient = null
         this._subscriber = null
         this._publisher = null
         this._isConnected = false
@@ -227,5 +286,6 @@ export const redisAdapter = RedisAdapter.getInstance()
 
 // Export convenience methods
 export const getRedisClient = () => redisAdapter.client
+export const getBullMQClient = () => redisAdapter.bullmqClient
 export const getRedisSubscriber = () => redisAdapter.subscriber
 export const getRedisPublisher = () => redisAdapter.publisher

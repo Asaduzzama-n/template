@@ -1,4 +1,4 @@
-import { Secret } from 'jsonwebtoken'
+import { Secret, SignOptions } from 'jsonwebtoken'
 import { jwtHelper } from '../../../helpers/jwtHelper'
 import config from '../../../config'
 import { Types } from 'mongoose'
@@ -8,12 +8,12 @@ const createToken = (authId: Types.ObjectId, role: string, name?: string, email?
   const accessToken = jwtHelper.createToken(
     { authId, role, name, email, profile, deviceToken },
     config.jwt.jwt_secret as Secret,
-    config.jwt.jwt_expire_in as string,
+    config.jwt.jwt_expire_in as SignOptions['expiresIn'],
   )
   const refreshToken = jwtHelper.createToken(
     { authId, role, name, email, deviceToken },
     config.jwt.jwt_refresh_secret as Secret,
-    config.jwt.jwt_refresh_expire_in as string,
+    config.jwt.jwt_refresh_expire_in as SignOptions['expiresIn'],
   )
 
   return { accessToken, refreshToken }
@@ -23,7 +23,7 @@ const tempAccessToken = (authId: Types.ObjectId, role: string, name?: string, em
   const accessToken = jwtHelper.createToken(
     { authId, role, name, email, profile, deviceToken },
     'asjdhashd#$uaas98',
-    config.jwt.jwt_expire_in as string,
+    config.jwt.jwt_expire_in as SignOptions['expiresIn'],
   )
 
   return { accessToken }
