@@ -1,4 +1,4 @@
-import { Model, Types } from 'mongoose'
+import { HydratedDocument, Model, Types } from 'mongoose'
 
 type IAuthentication = {
   restrictionLeftAt: Date | null
@@ -12,13 +12,12 @@ type IAuthentication = {
   authType?: 'createAccount' | 'resetPassword'
 }
 
-
 export type Point = {
   type: 'Point'
   coordinates: [number, number] // [longitude, latitude]
 }
 
-export type IUser = {
+export interface IUser {
   _id: Types.ObjectId
   name?: string
   email?: string
@@ -44,3 +43,6 @@ export type UserModel = {
     savedPassword: string,
   ) => Promise<boolean>
 } & Model<IUser>
+
+
+export type UserDocument = HydratedDocument<IUser>

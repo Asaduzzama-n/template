@@ -1,8 +1,6 @@
 import { Schema, model } from 'mongoose'
-import { IUser, UserModel } from './user.interface'
+import { IUser, UserDocument, UserModel } from './user.interface'
 import { USER_ROLES, USER_STATUS } from '../../../enum/user'
-import ApiError from '../../../errors/ApiError'
-import { StatusCodes } from 'http-status-codes'
 import config from '../../../config'
 import bcrypt from 'bcrypt'
 
@@ -15,6 +13,8 @@ const userSchema = new Schema<IUser, UserModel>(
     email: {
       type: String,
       trim: true,
+      unique: true,
+      index: true,
     },
     phone: {
       type: String,
@@ -118,17 +118,9 @@ userSchema.statics.isPasswordMatched = async function (
   return await bcrypt.compare(givenPassword, savedPassword)
 }
 
-userSchema.pre<IUser>('save', async function (next) {
-  //find the user by email
-  const isExist = await User.findOne({
-    email: this.email,
-    status: { $in: [USER_STATUS.ACTIVE, USER_STATUS.RESTRICTED] },
-  })
-  if (isExist) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'An account with this email already exists',
-    )
+userSchema.pre<UserDocument>('save', async function (next) {
+  if (!this.isModified('password')) {
+    return next()
   }
 
   this.password = await bcrypt.hash(
