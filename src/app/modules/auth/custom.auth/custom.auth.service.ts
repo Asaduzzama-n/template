@@ -15,21 +15,30 @@ import { jwtHelper } from '../../../../helpers/jwtHelper'
 import { JwtPayload } from 'jsonwebtoken'
 import { IUser } from '../../user/user.interface'
 import { emailHelper } from '../../../../helpers/emailHelper'
-
+import {
+  IVerification,
+  TypeEnum,
+} from '../../verification/verification.interface'
+import mongoose from 'mongoose'
+import { Verification } from '../../verification/verification.model'
 
 const createUser = async (payload: IUser) => {
+  const session = await mongoose.startSession()
+
   try {
+    session.startTransaction()
+
     payload.email = payload.email?.toLowerCase().trim()
 
     const { otp, expiresIn, hashedOtp } = await generateOtp()
 
-    const authentication = {
-      email: payload.email,
-      oneTimeCode: hashedOtp,
+    const authentication: IVerification = {
+      identifier: payload.email,
+      otpHash: hashedOtp,
       expiresAt: expiresIn,
-      latestRequestAt: new Date(),
-      requestCount: 1,
-      authType: 'createAccount',
+      latestRequest: new Date(),
+      attempts: 1,
+      type: TypeEnum.ACCOUNT_ACTIVATION,
     }
 
     //send email or sms with otp
@@ -39,17 +48,24 @@ const createUser = async (payload: IUser) => {
       otp,
     })
 
-    const user = await User.create({
-      ...payload,
-      password: payload.password,
-      authentication,
-    })
-
+    const [user, _] = await Promise.all([
+      User.create(
+        {
+          ...payload,
+          password: payload.password,
+        },
+        { session },
+      ),
+      Verification.create(authentication, { session }),
+    ])
 
     emailHelper.sendEmail(createAccount)
 
+    await session.commitTransaction()
+
     return `${config.node_env === 'development' ? `${payload.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
   } catch (error: any) {
+    await session.abortTransaction()
     if (error.code === 11000) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
@@ -60,6 +76,8 @@ const createUser = async (payload: IUser) => {
       StatusCodes.BAD_REQUEST,
       'Something went wrong while creating account. Please try again.',
     )
+  } finally {
+    await session.endSession()
   }
 }
 

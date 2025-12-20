@@ -1,0 +1,374 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API Documentation",
+    "version": "1.0.0",
+    "description": "Generated API documentation"
+  },
+  "paths": {
+    "/verification": {
+      "post": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Create a new Verification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Verification created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Verification"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Get all Verifications",
+        "responses": {
+          "200": {
+            "description": "List of Verifications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Verification"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verification/{id}": {
+      "get": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Get Verification by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Verification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Verification"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Verification not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Update Verification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Verification ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Verification"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Verification not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Verification"
+        ],
+        "summary": "Delete Verification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Verification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Verification"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Verification not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Verification": {
+        "type": "object",
+        "properties": {
+          "_id": {
+            "type": "string",
+            "description": "MongoDB ObjectId"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "account_activation",
+              "reset_password"
+            ],
+            "description": "type field"
+          },
+          "otpHash": {
+            "type": "string",
+            "description": "otpHash field"
+          },
+          "requestCount": {
+            "type": "number",
+            "description": "requestCount field"
+          },
+          "latestRequest": {
+            "type": "string",
+            "format": "date-time",
+            "description": "latestRequest field"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "expiresAt field"
+          },
+          "attempts": {
+            "type": "number",
+            "description": "attempts field"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp"
+          }
+        },
+        "required": [
+          "_id"
+        ]
+      },
+      "VerificationCreate": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "account_activation",
+              "reset_password"
+            ],
+            "description": "type field"
+          },
+          "otpHash": {
+            "type": "string",
+            "description": "otpHash field"
+          },
+          "requestCount": {
+            "type": "number",
+            "description": "requestCount field"
+          },
+          "latestRequest": {
+            "type": "string",
+            "format": "date-time",
+            "description": "latestRequest field"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "expiresAt field"
+          },
+          "attempts": {
+            "type": "number",
+            "description": "attempts field"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "createdAt field"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "updatedAt field"
+          }
+        },
+        "required": []
+      },
+      "VerificationUpdate": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "account_activation",
+              "reset_password"
+            ],
+            "description": "type field"
+          },
+          "otpHash": {
+            "type": "string",
+            "description": "otpHash field"
+          },
+          "requestCount": {
+            "type": "number",
+            "description": "requestCount field"
+          },
+          "latestRequest": {
+            "type": "string",
+            "format": "date-time",
+            "description": "latestRequest field"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "expiresAt field"
+          },
+          "attempts": {
+            "type": "number",
+            "description": "attempts field"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "createdAt field"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "updatedAt field"
+          }
+        }
+      }
+    }
+  }
+}

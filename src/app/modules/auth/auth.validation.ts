@@ -24,7 +24,7 @@ const forgetPasswordZodSchema = z.object({
     email: z
       .string()
       .optional()
-      
+
       .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
         message: 'Invalid email format',
       }),
@@ -97,7 +97,7 @@ const resendOtpZodSchema = z.object({
       .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
         message: 'Invalid phone number format',
       }),
-      authType:z.string(z.enum(['resetPassword','createAccount']).optional())
+    authType: z.string(z.enum(['resetPassword', 'createAccount']).optional()),
   }),
 })
 
@@ -123,34 +123,42 @@ const changePasswordZodSchema = z.object({
 })
 
 const deleteAccount = z.object({
-  body: z
-    .object({
+  body: z.object({
     password: z.string({
       required_error: 'Password is required',
-    })
-   })
-    
+    }),
+  }),
 })
 
 const createUserZodSchema = z.object({
-  body: z.object({
-    email: z.string({ required_error: 'Email is required' }).email(),
-    password: z.string({ required_error: 'Password is required' }).min(6),
-    name: z.string({ required_error: 'Name is required' }).optional(),
-    phone: z.string({ required_error: 'Phone is required' }).optional(),
-    address: z.string().optional(),
-    role: z.enum(
-      [
-        USER_ROLES.ADMIN,
-        USER_ROLES.USER,
-        USER_ROLES.GUEST,
-        USER_ROLES.CUSTOMER,
-      ],
-      {
-        message: 'Role must be one of admin, user, guest',
-      },
-    ),
-  }),
+  body: z
+    .object({
+      email: z
+        .string({ required_error: 'Email is required' })
+        .email({ message: 'Invalid email format' }),
+      password: z
+        .string({ required_error: 'Password is required' })
+        .min(6, { message: 'Password must be at least 6 characters' })
+        .max(20, { message: 'Password must be at most 20 characters' })
+        .regex(/^(?=.*[A-Za-z])(?=.*\d)/, {
+          message: 'Password must contain at least one letter and one number',
+        }),
+      name: z.string({ required_error: 'Name is required' }),
+      phone: z.string({ required_error: 'Phone is required' }).optional(),
+      address: z.string().optional(),
+      role: z.enum(
+        [
+          USER_ROLES.ADMIN,
+          USER_ROLES.USER,
+          USER_ROLES.GUEST,
+          USER_ROLES.CUSTOMER,
+        ],
+        {
+          message: 'Role must be one of admin, user, guest',
+        },
+      ),
+    })
+    .strict(),
 })
 
 const socialLoginZodSchema = z.object({
@@ -170,5 +178,5 @@ export const AuthValidations = {
   changePasswordZodSchema,
   createUserZodSchema,
   deleteAccount,
-  socialLoginZodSchema
+  socialLoginZodSchema,
 }
