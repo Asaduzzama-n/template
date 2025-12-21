@@ -53,4 +53,10 @@ export default {
     cloudinary_api_key: process.env.CLOUDINARY_API_KEY,
     cloudinary_secret: process.env.CLOUDINARY_SECRET,
   },
+  lock_out_strategy: process.env.LOCKOUT_STRATEGY,
+  max_wrong_attempts: process.env.MAX_WRONG_ATTEMPTS,
+  restriction_minutes: process.env.RESTRICTION_MINUTES,
+  otp_request_cooldown_seconds: process.env.OTP_REQUEST_COOLDOWN_SECONDS,
+  max_otp_attempts: process.env.MAX_OTP_ATTEMPTS,
+  max_otp_request_allowed:process.env.MAX_OTP_REQUEST_ALLOWED
 }

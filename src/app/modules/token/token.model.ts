@@ -12,14 +12,18 @@ const tokenSchema = new Schema<IToken, TokenModel>(
       type: String,
       required: true,
     },
-    expireAt: {
+    expiresAt: {
       type: Date,
       required: true,
+      default: new Date(Date.now() + 15 * 60 * 100),
     },
   },
   {
     timestamps: true,
   },
 )
+
+tokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+
 
 export const Token = model<IToken, TokenModel>('Token', tokenSchema)

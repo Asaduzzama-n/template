@@ -1,7 +1,9 @@
+import { VERIFICATION_TYPE } from "../app/modules/verification/verification.interface"
+
 export type ICreateAccount = {
-  name: string
   email: string
   otp: string
+  name?: string
 }
 
 export type IResetPassword = {
@@ -15,5 +17,5 @@ export type IEmailOrPhoneVerification = {
   name: string
   email?: string
   phone?: string
-  type: 'createAccount' | 'resetPassword'
+  type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION | VERIFICATION_TYPE.RESET_PASSWORD
 }

@@ -7,61 +7,52 @@ import config from '../../../../config'
 import { Token } from '../../token/token.model'
 import { IAuthResponse, IResetPassword } from '../auth.interface'
 import { emailTemplate } from '../../../../shared/emailTemplate'
-import cryptoToken, { generateOtp } from '../../../../utils/crypto'
+import cryptoToken, { compareOtp, generateOtp } from '../../../../utils/crypto'
 import bcrypt from 'bcrypt'
-import { ILoginData } from '../../../../interfaces/auth'
-import { AuthCommonServices, authResponse } from '../common'
+import { IChangePassword, ILoginData } from '../../../../interfaces/auth'
+import { AuthCommonServices, authResponse, getSanitizeEmail } from '../common'
 import { jwtHelper } from '../../../../helpers/jwtHelper'
 import { JwtPayload } from 'jsonwebtoken'
 import { IUser } from '../../user/user.interface'
 import { emailHelper } from '../../../../helpers/emailHelper'
 import {
   IVerification,
-  TypeEnum,
+  VERIFICATION_TYPE,
 } from '../../verification/verification.interface'
 import mongoose from 'mongoose'
 import { Verification } from '../../verification/verification.model'
 
+//done
 const createUser = async (payload: IUser) => {
   const session = await mongoose.startSession()
 
   try {
     session.startTransaction()
 
-    payload.email = payload.email?.toLowerCase().trim()
+    payload.email = getSanitizeEmail(payload.email)
 
     const { otp, expiresIn, hashedOtp } = await generateOtp()
 
-    const authentication: IVerification = {
+    const authentication: Omit<IVerification, 'expiresAt' | 'requestCount'> = {
       identifier: payload.email,
       otpHash: hashedOtp,
-      expiresAt: expiresIn,
+      otpExpiresAt: expiresIn,
       latestRequest: new Date(),
       attempts: 1,
-      type: TypeEnum.ACCOUNT_ACTIVATION,
+      type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION,
     }
 
-    //send email or sms with otp
     const createAccount = emailTemplate.createAccount({
       name: payload.name!,
       email: payload.email!,
       otp,
     })
 
-    const [user, _] = await Promise.all([
-      User.create(
-        {
-          ...payload,
-          password: payload.password,
-        },
-        { session },
-      ),
-      Verification.create(authentication, { session }),
-    ])
+    await User.create([payload], { session }),
+      await Verification.create([authentication], { session }),
+      await session.commitTransaction()
 
     emailHelper.sendEmail(createAccount)
-
-    await session.commitTransaction()
 
     return `${config.node_env === 'development' ? `${payload.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
   } catch (error: any) {
@@ -80,42 +71,50 @@ const createUser = async (payload: IUser) => {
     await session.endSession()
   }
 }
-
+//done
 const customLogin = async (payload: ILoginData): Promise<IAuthResponse> => {
-  const { email, phone } = payload
-  const query = email ? { email: email.toLowerCase().trim() } : { phone: phone }
+  const email = getSanitizeEmail(payload.email)
 
-  const isUserExist = await User.findOne({
-    ...query,
+  const user = await User.findOne({
+    email,
     status: { $in: [USER_STATUS.ACTIVE, USER_STATUS.RESTRICTED] },
   })
     .select('+password +authentication')
     .lean()
-  if (!isUserExist) {
+
+  if (!user) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      `No account found with this ${email ? 'email' : 'phone'}`,
+      'You provided the wrong credentials, please try again with valid one.',
     )
   }
 
-  const result = await AuthCommonServices.handleLoginLogic(payload, isUserExist)
+  if (user.status === USER_STATUS.RESTRICTED) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'Your account has been restricted by an administrator. Please contact support.',
+    )
+  }
 
-  return result
+  return await AuthCommonServices.handleLoginLogic(payload, user)
 }
 
 const adminLogin = async (payload: ILoginData): Promise<IAuthResponse> => {
-  const { email, phone } = payload
-  const query = email ? { email: email.trim().toLowerCase() } : { phone: phone }
+  const { email } = payload
+
+  const sanitizedEmail = getSanitizeEmail(email)
 
   const isUserExist = await User.findOne({
-    ...query,
+    email: sanitizedEmail,
+    status: { $in: [USER_STATUS.ACTIVE] },
   })
     .select('+password +authentication')
     .lean()
+
   if (!isUserExist) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      `No account found with this ${email ? 'email' : 'phone'}`,
+      `Invalid credentials, please try again with valid one.`,
     )
   }
 
@@ -145,270 +144,401 @@ const adminLogin = async (payload: ILoginData): Promise<IAuthResponse> => {
     isUserExist.email!,
   )
 
-  return authResponse(
-    StatusCodes.OK,
-    `Welcome back ${isUserExist.name}`,
-    isUserExist.role,
-    tokens.accessToken,
-    tokens.refreshToken,
-  )
-}
-
-const forgetPassword = async (email?: string, phone?: string) => {
-  const query = email
-    ? { email: email.toLocaleLowerCase().trim() }
-    : { phone: phone }
-  const isUserExist = await User.findOne({
-    ...query,
-    status: { $in: [USER_STATUS.ACTIVE, USER_STATUS.RESTRICTED] },
+  return authResponse(StatusCodes.OK, `Welcome back ${isUserExist.name}`, {
+    role: isUserExist.role,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
   })
-
-  if (!isUserExist) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'No account found with this email or phone',
-    )
-  }
-
-  const { otp, expiresIn, hashedOtp } = await generateOtp()
-
-  if (phone) {
-    //implement this feature using twilio/aws sns
-  }
-
-  const authentication = {
-    email: isUserExist.email,
-    resetPassword: true,
-    oneTimeCode: hashedOtp,
-    expiresAt: expiresIn,
-    latestRequestAt: new Date(),
-    requestCount: 1,
-    authType: 'resetPassword',
-  }
-
-  await User.findByIdAndUpdate(
-    isUserExist._id,
-    {
-      $set: { authentication: authentication },
-    },
-    { new: true },
-  )
-
-  // //send otp to user
-  if (email) {
-    const forgetPasswordEmailTemplate = emailTemplate.resetPassword({
-      name: isUserExist.name as string,
-      email: isUserExist.email as string,
-      otp,
-    })
-    emailHelper.sendEmail(forgetPasswordEmailTemplate)
-  }
-
-  return `${config.node_env === 'development' ? `${isUserExist.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
 }
 
-const resetPassword = async (resetToken: string, payload: IResetPassword) => {
-  const { newPassword, confirmPassword } = payload
-  if (newPassword !== confirmPassword) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Passwords do not match')
-  }
+//done
+const forgetPassword = async (email: string) => {
+  const sanitizedEmail = getSanitizeEmail(email)
 
-  const isTokenExist = await Token.findOne({ token: resetToken }).lean()
-
-  if (!isTokenExist) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      "You don't have authorization to reset your password, please verify your account first.",
-    )
-  }
-
-  const isUserExist = await User.findById(isTokenExist.user)
+  const isUserExist = await User.findOne({
+    email: sanitizedEmail,
+    status: { $ne: USER_STATUS.DELETED },
+  })
     .select('+authentication')
     .lean()
 
   if (!isUserExist) {
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Something went wrong, please try again. or contact support.',
+      StatusCodes.NOT_FOUND,
+      'No account found with this email.',
     )
   }
 
-  const { authentication } = isUserExist
-  if (!authentication?.resetPassword) {
+  if (isUserExist.status === USER_STATUS.RESTRICTED) {
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'You don\'t have permission to change the password. Please click again to "Forgot Password"',
+      StatusCodes.FORBIDDEN,
+      'Your account has been restricted by an administrator. Please contact support.',
     )
   }
 
-  const isTokenValid = isTokenExist?.expireAt > new Date()
-  if (!isTokenValid) {
+  // 2. Check for Account-Level Restrictions (Admin ban or Login Lockout)
+  const { isRestricted, restrictionLeftAt } = isUserExist.authentication || {}
+
+  if (isRestricted && restrictionLeftAt && new Date() < restrictionLeftAt) {
+    const remaining = Math.ceil(
+      (restrictionLeftAt.getTime() - Date.now()) / 60000,
+    )
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Your reset token has expired, please try again.',
+      StatusCodes.TOO_MANY_REQUESTS,
+      `Your account is locked. Try again in ${remaining} minutes.`,
     )
   }
 
-  const hashPassword = await bcrypt.hash(
-    newPassword,
-    Number(config.bcrypt_salt_rounds),
-  )
-  const updatedUserData = {
-    password: hashPassword,
-    authentication: {
-      resetPassword: false,
-      otp: '',
-      expiresAt: null,
-      latestRequestAt: null,
-      requestCount: 0,
-      authType: '',
+  // 3. Cooldown & Brute Force Check (Verification Model)
+  const existingVerification = await Verification.findOne({
+    identifier: isUserExist.email,
+    type: VERIFICATION_TYPE.RESET_PASSWORD,
+  }).lean()
+
+  if (existingVerification) {
+    const timeSinceLastRequest =
+      (Date.now() - existingVerification.latestRequest.getTime()) / 1000
+    const waitTime = Math.ceil(
+      Number(config.otp_request_cooldown_seconds) - timeSinceLastRequest,
+    )
+    if (existingVerification.latestRequest) {
+      const secondsSinceLast =
+        (Date.now() - existingVerification.latestRequest.getTime()) / 1000
+      if (secondsSinceLast < Number(config.otp_request_cooldown_seconds)) {
+        throw new ApiError(
+          StatusCodes.TOO_MANY_REQUESTS,
+          `Please wait ${waitTime} seconds before requesting a new OTP.`,
+        )
+      }
+    }
+
+    // Check Request Limit - NEW
+    if (
+      existingVerification.requestCount >=
+      Number(config.max_otp_request_allowed || 5)
+    ) {
+      throw new ApiError(
+        StatusCodes.TOO_MANY_REQUESTS,
+        'Maximum reset attempts reached. Try again in 15 minutes.',
+      )
+    }
+  }
+
+  // 4. Generate OTP
+  const { otp, expiresIn, hashedOtp } = await generateOtp()
+
+  // 5. Atomic Upsert to Verification Model (Correct Approach)
+  // This manages the cooldown and the OTP data in one place
+  await Verification.findOneAndUpdate(
+    { identifier: isUserExist.email, type: VERIFICATION_TYPE.RESET_PASSWORD },
+    {
+      $set: {
+        otpHash: hashedOtp,
+        otpExpiresAt: expiresIn,
+        latestRequest: new Date(),
+        // We set the TTL index 'expiresAt' to 15 mins from NOW
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+      $inc: { attempts: 0 }, // Reset attempts for a new OTP
     },
-  }
-
-  await User.findByIdAndUpdate(
-    isUserExist._id,
-    { $set: updatedUserData },
-    { new: true },
+    { upsert: true, new: true },
   )
 
-  return {
-    message: `Password reset successfully, please login with your new password.`,
+  // 6. Send Email (Fire and forget or use a Job Queue)
+  const forgetPasswordEmailTemplate = emailTemplate.resetPassword({
+    name: isUserExist.name as string,
+    email: isUserExist.email as string,
+    otp,
+  })
+
+  emailHelper.sendEmail(forgetPasswordEmailTemplate).catch(err => {
+    console.error('Failed to send reset email:', err)
+  })
+
+  return config.node_env === 'development'
+    ? { email: isUserExist.email, otp, message: 'OTP generated (Dev Mode)' }
+    : 'An OTP has been sent to your email. Please check your inbox.'
+}
+
+const resetPassword = async (
+  resetToken: string,
+  payload: IResetPassword,
+): Promise<{ message: string }> => {
+  const { newPassword, confirmPassword } = payload
+  const session = await mongoose.startSession()
+
+  try {
+    session.startTransaction()
+
+    // 2. Fetch and Validate Reset Token
+    const isTokenExist = await Token.findOne({ token: resetToken }).session(
+      session,
+    )
+
+    if (!isTokenExist) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Invalid or expired reset session. Please verify your account again.',
+      )
+    }
+
+    // 3. Expiry Check
+    if (new Date() > isTokenExist.expiresAt) {
+      await Token.deleteOne({ _id: isTokenExist._id }).session(session)
+      await session.commitTransaction() // Persist the deletion of expired token
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Reset token has expired.')
+    }
+
+    // 4. Fetch User (Include authentication for security reset)
+    const user = await User.findById(isTokenExist.user)
+      .select('+password +authentication')
+      .session(session)
+
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User account not found.')
+    }
+
+    // 5. Admin Status Check (Safety first)
+    if (user.status === USER_STATUS.RESTRICTED) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Your account is restricted.')
+    }
+
+    user.password = newPassword
+    user.authentication.passwordChangedAt = new Date()
+    user.authentication.wrongLoginAttempts = 0
+    user.authentication.isRestricted = false
+    user.authentication.restrictionLeftAt = null
+
+    await user.save({ session })
+
+    // 7. CONSUME TOKEN: Delete immediately so it can't be used again (Replay attack protection)
+    await Token.deleteOne({ _id: isTokenExist._id }).session(session)
+
+    await session.commitTransaction()
+
+    return {
+      message: `Password reset successfully. You can now login with your new password.`,
+    }
+  } catch (error) {
+    await session.abortTransaction()
+    throw error
+  } finally {
+    await session.endSession()
   }
 }
 
 const verifyAccount = async (
   email: string,
   onetimeCode: string,
+  requiredType: VERIFICATION_TYPE, // 1. Add this parameter
 ): Promise<IAuthResponse> => {
-  //verify fo new user
-  if (!onetimeCode) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP is required.')
-  }
-  const isUserExist = await User.findOne({
-    email: email.toLowerCase().trim(),
-    status: { $nin: [USER_STATUS.DELETED] },
-  })
-    .select('+password +authentication')
-    .lean()
+  const sanitizedEmail = getSanitizeEmail(email)
 
-  if (!isUserExist) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      `No account found with this ${email}, please register first.`,
-    )
-  }
+  const session = await mongoose.startSession()
 
-  const { authentication } = isUserExist
+  try {
+    session.startTransaction()
 
-  //check the otp
-  if (authentication?.oneTimeCode !== onetimeCode) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Invalid OTP, please try again.',
-    )
-  }
-
-  const currentDate = new Date()
-  if (authentication?.expiresAt! < currentDate) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'OTP has expired, please try again.',
-    )
-  }
-
-  //either newly created user or existing user
-  if (!isUserExist.verified) {
-    await User.findByIdAndUpdate(
-      isUserExist._id,
-      { $set: { verified: true } },
-      { new: true },
-    )
-
-    const tokens = AuthHelper.createToken(
-      isUserExist._id,
-      isUserExist.role,
-      isUserExist.name,
-      isUserExist.email,
-    )
-    return authResponse(
-      StatusCodes.OK,
-      `Welcome ${isUserExist.name} to our platform.`,
-      isUserExist.role,
-      tokens.accessToken,
-      tokens.refreshToken,
-    )
-  } else {
-    await User.findByIdAndUpdate(
-      isUserExist._id,
-      {
-        $set: {
-          authentication: {
-            oneTimeCode: '',
-            expiresAt: null,
-            latestRequestAt: null,
-            requestCount: 0,
-            authType: '',
-            resetPassword: true,
-          },
-        },
-      },
-      { new: true },
-    )
-
-    const token = await Token.create({
-      token: cryptoToken(),
-      user: isUserExist._id,
-      expireAt: new Date(Date.now() + 5 * 60 * 1000), // 15 minutes
+    const user = await User.findOne({
+      email: sanitizedEmail,
+      status: { $ne: USER_STATUS.DELETED },
     })
+      .select('+authentication')
+      .session(session)
 
-    if (!token) {
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Account not found.')
+    }
+
+    if (user.status === USER_STATUS.RESTRICTED) {
       throw new ApiError(
         StatusCodes.BAD_REQUEST,
-        'Something went wrong, please try again. or contact support.',
+        'Your account has been restricted by admin, please contact support.',
       )
     }
 
-    return authResponse(
-      StatusCodes.OK,
-      'OTP verified successfully, please reset your password.',
-      undefined,
-      undefined,
-      undefined,
-      token.token,
+    // 2. Fetch Verification Record
+    const verification = await Verification.findOne({
+      identifier: sanitizedEmail,
+      type: requiredType, // Now it is context-aware
+    }).session(session)
+
+    if (!verification) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Invalid or expired session. Please resend OTP.',
+      )
+    }
+
+    // 3. Brute Force Protection: Check Attempts
+    if (verification.attempts >= Number(config.max_otp_attempts)) {
+      // Optional: Logically you could also restrict the user account here
+      throw new ApiError(
+        StatusCodes.TOO_MANY_REQUESTS,
+        'Too many failed OTP attempts. Please request a new one.',
+      )
+    }
+
+    // 4. Expiry Check
+    if (new Date() > verification.otpExpiresAt) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'OTP has expired.')
+    }
+
+    // 5. Verify Code
+    const isOtpValid = await compareOtp(onetimeCode, verification.otpHash)
+
+    if (!isOtpValid) {
+      // Increment attempts atomically
+      await Verification.findByIdAndUpdate(verification._id, {
+        $inc: { attempts: 1 },
+      }).session(session)
+
+      await session.commitTransaction() // Save the failed attempt count
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid OTP.')
+    }
+
+    // --- LOGIC BRANCHES ---
+
+    // A. ACCOUNT ACTIVATION
+    if (verification.type === VERIFICATION_TYPE.ACCOUNT_ACTIVATION) {
+      await User.findByIdAndUpdate(user._id, {
+        $set: { verified: true },
+      }).session(session)
+
+      await Verification.deleteOne({
+        identifier: sanitizedEmail,
+        type: requiredType,
+      }).session(session)
+
+      await session.commitTransaction()
+
+      const tokens = AuthHelper.createToken(
+        user._id,
+        user.role,
+        user.name,
+        user.email,
+      )
+      return authResponse(StatusCodes.OK, `Welcome, ${user.name}.`, {
+        role: user.role,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      })
+    }
+
+    // B. RESET PASSWORD
+    if (verification.type === VERIFICATION_TYPE.RESET_PASSWORD) {
+      const resetToken = cryptoToken()
+
+      await Token.create(
+        [
+          {
+            token: resetToken,
+            user: user._id,
+            // Ensure token expires in 10-15 minutes
+            expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+          },
+        ],
+        { session },
+      )
+
+      // Clean up verification to prevent OTP reuse
+      await Verification.deleteOne({
+        identifier: sanitizedEmail,
+        type: requiredType,
+      }).session(session)
+
+      await session.commitTransaction()
+
+      return authResponse(
+        StatusCodes.OK,
+        'OTP verified. You may now reset your password.',
+        {
+          token: resetToken,
+        },
+      )
+    }
+
+    throw new ApiError(
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      'Unknown verification type.',
     )
+  } catch (error) {
+    await session.abortTransaction()
+    throw error
+  } finally {
+    await session.endSession()
   }
 }
 
 const getRefreshToken = async (token: string) => {
   try {
+    // 1. Verify Token Signature
     const decodedToken = jwtHelper.verifyToken(
       token,
       config.jwt.jwt_refresh_secret as string,
     )
 
-    const { userId, role } = decodedToken
+    const { userId, iat } = decodedToken
 
+    // 2. Fetch User from DB (Critical for Enterprise)
+    const user = await User.findById(userId).select('+authentication').lean()
+
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User no longer exists.')
+    }
+
+    // 3. Security Check: Admin Restriction
+    if (user.status === USER_STATUS.DELETED) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Account has been deleted.')
+    }
+
+    if (user.status === USER_STATUS.RESTRICTED) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        'Account restricted. Cannot refresh session.',
+      )
+    }
+
+    // 4. Security Check: Password Change Invalidation
+    // If password was changed after this refresh token was issued, reject it.
+    if (
+      user.authentication?.passwordChangedAt &&
+      AuthHelper.isTokenInvalidated(user.authentication.passwordChangedAt, iat!)
+    ) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        'Session expired due to password change.',
+      )
+    }
+
+    // 5. Generate NEW Access Token
+    // Usually, you only return a new Access Token, not a new Refresh Token (unless using rotation)
     const tokens = AuthHelper.createToken(
-      userId,
-      role,
-      decodedToken.name,
-      decodedToken.email,
+      user._id,
+      user.role,
+      user.name,
+      user.email,
     )
 
     return {
       accessToken: tokens.accessToken,
     }
   } catch (error) {
+    if (error instanceof ApiError) throw error
+
     if (error instanceof Error && error.name === 'TokenExpiredError') {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, 'Refresh Token has expired')
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        'Refresh Token has expired. Please login again.',
+      )
     }
-    throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Refresh Token')
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Refresh Token.')
   }
 }
 
 const socialLogin = async (
   appId: string,
-  deviceToken: string,
+  fcmToken: string,
 ): Promise<IAuthResponse> => {
   const isUserExist = await User.findOne({
     appId,
@@ -417,7 +547,7 @@ const socialLogin = async (
   if (!isUserExist) {
     const createdUser = await User.create({
       appId,
-      deviceToken,
+      fcmToken,
       status: USER_STATUS.ACTIVE,
     })
     if (!createdUser)
@@ -431,14 +561,16 @@ const socialLogin = async (
     return authResponse(
       StatusCodes.OK,
       `Welcome ${createdUser.name} to our platform.`,
-      createdUser.role,
-      tokens.accessToken,
-      tokens.refreshToken,
+      {
+        role: createdUser.role,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      },
     )
   } else {
     await User.findByIdAndUpdate(isUserExist._id, {
       $set: {
-        deviceToken,
+        fcmToken,
       },
     })
 
@@ -451,211 +583,290 @@ const socialLogin = async (
     //send token to client
     return authResponse(
       StatusCodes.OK,
-      `Welcome back ${isUserExist.name}`,
-      isUserExist.role,
-      tokens.accessToken,
-      tokens.refreshToken,
-    )
-  }
-}
-
-const resendOtpToPhoneOrEmail = async (
-  authType: 'resetPassword' | 'createAccount',
-  email?: string,
-  phone?: string,
-) => {
-  const query = email ? { email: email } : { phone: phone }
-  const isUserExist = await User.findOne({
-    ...query,
-    status: { $in: [USER_STATUS.ACTIVE, USER_STATUS.RESTRICTED] },
-  }).select('+authentication')
-  if (!isUserExist) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      `No account found with this ${email ? 'email' : 'phone'}`,
-    )
-  }
-
-  //check the request count
-  const { authentication } = isUserExist
-  if (authentication?.requestCount! >= 5) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'You have exceeded the maximum number of requests. Please try again later.',
-    )
-  }
-  const { otp, expiresIn, hashedOtp } = await generateOtp()
-  const updatedAuthentication = {
-    oneTimeCode: hashedOtp,
-    latestRequestAt: new Date(),
-    requestCount: authentication?.requestCount! + 1,
-    expiresAt: expiresIn,
-  }
-
-  //send otp to user
-  if (email) {
-    const forgetPasswordEmailTemplate = emailTemplate.resendOtp({
-      email: isUserExist.email as string,
-      name: isUserExist.name as string,
-      otp,
-      type: authType,
-    })
-    emailHelper.sendEmail(forgetPasswordEmailTemplate)
-
-    await User.findByIdAndUpdate(
-      isUserExist._id,
+      `Welcome ${isUserExist.name} to our platform.`,
       {
-        $set: { authentication: updatedAuthentication },
+        role: isUserExist.role,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
       },
-      { new: true },
     )
   }
-
-  if (phone) {
-    //implement this feature using twilio/aws sns
-
-    await User.findByIdAndUpdate(
-      isUserExist._id,
-      {
-        $set: { authentication: updatedAuthentication },
-      },
-      { new: true },
-    )
-  }
-
-  return `${config.node_env === 'development' ? `${isUserExist.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
 }
 
 const deleteAccount = async (user: JwtPayload, password: string) => {
   const { authId } = user
-  const isUserExist = await User.findById(authId).select('+password')
+
+  const isUserExist = await User.findById(authId).select(
+    '+password +authentication',
+  )
+
   if (!isUserExist) {
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Failed to delete account. Please try again.',
+      StatusCodes.NOT_FOUND,
+      'User not found. Failed to delete account.',
     )
   }
 
   if (isUserExist.status === USER_STATUS.DELETED) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      'Requested user is already deleted.',
+      'This account has already been deleted.',
     )
   }
+  const {
+    isRestricted,
+    restrictionLeftAt,
+    wrongLoginAttempts = 0,
+  } = isUserExist.authentication || {}
 
-  const isPasswordMatched = await bcrypt.compare(password, isUserExist.password)
+  // 3. Brute Force Check (Check if user is currently locked out)
+  if (isRestricted && restrictionLeftAt && new Date() < restrictionLeftAt) {
+    const remaining = Math.ceil(
+      (restrictionLeftAt.getTime() - Date.now()) / 60000,
+    )
+    throw new ApiError(
+      StatusCodes.TOO_MANY_REQUESTS,
+      `Action blocked. Try again in ${remaining} minutes.`,
+    )
+  }
+  const isPasswordMatched = await User.isPasswordMatched(
+    password,
+    isUserExist.password,
+  )
 
   if (!isPasswordMatched) {
+    const attempts = wrongLoginAttempts + 1
+    const shouldLock = attempts >= Number(config.max_wrong_attempts)
+
+    const updateQuery: any = {
+      $inc: { 'authentication.wrongLoginAttempts': 1 },
+      $set: { 'authentication.isRestricted': shouldLock },
+    }
+
+    if (shouldLock) {
+      const lockUntil = new Date(
+        Date.now() + Number(config.restriction_minutes) * 60 * 1000,
+      )
+      updateQuery.$set['authentication.restrictionLeftAt'] = lockUntil
+    }
+
+    await User.findByIdAndUpdate(authId, updateQuery)
+
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Please provide a valid password to delete your account.',
+      StatusCodes.UNAUTHORIZED,
+      'Invalid password. Please provide a valid password to delete your account.',
     )
   }
 
-  const deletedData = await User.findByIdAndUpdate(authId, {
-    $set: { status: USER_STATUS.DELETED },
+  const deletionTimestamp = Math.floor(Date.now() / 1000)
+  const deletedEmail = `${isUserExist.email}_deleted_${deletionTimestamp}`
+
+  await User.findByIdAndUpdate(authId, {
+    $set: {
+      status: USER_STATUS.DELETED,
+      email: deletedEmail,
+      verified: false,
+      // Clear security counters upon deletion
+      'authentication.wrongLoginAttempts': 0,
+      'authentication.isRestricted': false,
+      'authentication.restrictionLeftAt': null,
+    },
+    $unset: {
+      fcmToken: 1, // Remove push notification tokens
+      deviceToken: 1,
+    },
   })
 
-  return {
-    status: StatusCodes.OK,
-    message: 'Account deleted successfully.',
-    deletedData,
-  }
+  // 5. Success Response
+  return 'Your account has been deleted successfully. We are sorry to see you go.'
 }
 
 const resendOtp = async (
   email: string,
-  authType: 'createAccount' | 'resetPassword',
+  authType: VERIFICATION_TYPE, // Use the Enum for consistency
 ) => {
-  const isUserExist = await User.findOne({
-    email: email.toLowerCase().trim(),
-    status: { $in: [USER_STATUS.ACTIVE, USER_STATUS.RESTRICTED] },
-  }).select('+authentication')
-  if (!isUserExist) {
+  const sanitizedEmail = getSanitizeEmail(email)
+
+  // 1. Fetch User (Check if they are allowed to receive emails)
+  const user = await User.findOne({
+    email: sanitizedEmail,
+    status: { $ne: USER_STATUS.DELETED },
+  }).lean()
+
+  if (!user) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Account not found.')
+  }
+
+  if (user.status === USER_STATUS.RESTRICTED) {
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      `No account found with this ${email}, please try again.`,
+      StatusCodes.FORBIDDEN,
+      'Account restricted. Cannot resend OTP.',
     )
   }
 
-  const { authentication } = isUserExist
+  // 2. Fetch Existing Verification Record
+  const existingVerification = await Verification.findOne({
+    identifier: sanitizedEmail,
+    type: authType,
+  })
+
+  if (!existingVerification) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'No active session found. Please try the original action again.',
+    )
+  }
+  const OTP_RESEND_COOLDOWN = Number(config.otp_request_cooldown_seconds)
+  // 3. Cooldown Logic (Time-based check)
+  const secondsSinceLastRequest =
+    (Date.now() - existingVerification.latestRequest.getTime()) / 1000
+  if (secondsSinceLastRequest < OTP_RESEND_COOLDOWN) {
+    const waitTime = Math.ceil(OTP_RESEND_COOLDOWN - secondsSinceLastRequest)
+    throw new ApiError(
+      StatusCodes.TOO_MANY_REQUESTS,
+      `Please wait ${waitTime} seconds before requesting a new OTP.`,
+    )
+  }
+
+  // 4. Hard Limit Logic (Request count check)
+  if (existingVerification.attempts >= Number(config.max_otp_attempts)) {
+    throw new ApiError(
+      StatusCodes.TOO_MANY_REQUESTS,
+      'Maximum OTP resend limit reached. Please try again after 15 minutes.',
+    )
+  }
 
   const { otp, expiresIn, hashedOtp } = await generateOtp()
 
-  const authenticationPayload = {
-    oneTimeCode: hashedOtp,
-    latestRequestAt: new Date(),
-    requestCount: authentication?.requestCount! + 1,
-    expiresAt: expiresIn,
-  }
-
-  await User.findByIdAndUpdate(
-    isUserExist._id,
+  // 6. Atomic Update
+  await Verification.findOneAndUpdate(
+    { identifier: sanitizedEmail, type: authType },
     {
-      $set: { authentication: authenticationPayload },
+      $set: {
+        otpHash: hashedOtp,
+        otpExpiresAt: expiresIn,
+        latestRequest: new Date(),
+        attempts: 0, // Reset failed guessing attempts for the new code
+        // Refresh the 15-minute TTL so the document doesn't disappear
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      },
+      $inc: { requestCount: 1 }, // Increment the total requests for this session
     },
-    { new: true },
   )
 
-  if (authenticationPayload.requestCount! >= 5) {
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'You have exceeded the maximum number of requests. Please try again later.',
-    )
-  }
+  // 7. Send Email
+  const resendEmailTemplate = emailTemplate.resendOtp({
+    email: sanitizedEmail,
+    name: user.name as string,
+    otp,
+    type: authType,
+  })
 
-  //send otp to user
-  if (email) {
-    const forgetPasswordEmailTemplate = emailTemplate.resendOtp({
-      email: email as string,
-      name: isUserExist.name as string,
-      otp,
-      type: authType,
-    })
-    emailHelper.sendEmail(forgetPasswordEmailTemplate)
-  }
+  emailHelper.sendEmail(resendEmailTemplate).catch(err => {
+    console.error('Email Resend Failed:', err)
+  })
 
-  return 'OTP sent successfully.'
+  return 'A fresh OTP has been sent to your email.'
 }
 
 const changePassword = async (
-  user: JwtPayload,
-  currentPassword: string,
-  newPassword: string,
+  user: JwtPayload, // From Auth Middleware
+  payload: IChangePassword,
 ) => {
-  // Find the user with password field
-  const isUserExist = await User.findById(user.authId)
-    .select('+password')
-    .lean()
+  const { currentPassword, newPassword, confirmPassword } = payload
+  const { authId } = user
 
+  // 1. Basic Validation
+  if (newPassword !== confirmPassword) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'New passwords do not match.')
+  }
+
+  if (currentPassword === newPassword) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'New password cannot be the same as the old password.',
+    )
+  }
+
+  // 2. Fetch User with security fields
+  const isUserExist = await User.findById(authId).select(
+    '+password +authentication',
+  )
   if (!isUserExist) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found')
+    throw new ApiError(StatusCodes.NOT_FOUND, 'User not found.')
   }
 
-  // Check if current password matches
-  const isPasswordMatch = await AuthHelper.isPasswordMatched(
+  // 3. Admin Restriction Check
+  if (isUserExist.status === USER_STATUS.RESTRICTED) {
+    throw new ApiError(
+      StatusCodes.FORBIDDEN,
+      'Account restricted. Action denied.',
+    )
+  }
+
+  // 4. Brute Force Protection (Login Lockout check)
+  const {
+    isRestricted,
+    restrictionLeftAt,
+    wrongLoginAttempts = 0,
+  } = isUserExist.authentication || {}
+  if (isRestricted && restrictionLeftAt && new Date() < restrictionLeftAt) {
+    const remaining = Math.ceil(
+      (restrictionLeftAt.getTime() - Date.now()) / 60000,
+    )
+    throw new ApiError(
+      StatusCodes.TOO_MANY_REQUESTS,
+      `Security lockout active. Try again in ${remaining} minutes.`,
+    )
+  }
+
+  // 5. Verify Old Password
+  const isPasswordMatched = await User.isPasswordMatched(
     currentPassword,
-    isUserExist.password as string,
+    isUserExist.password,
   )
 
-  if (!isPasswordMatch) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Current password is incorrect')
+  if (!isPasswordMatched) {
+    // Increment wrongLoginAttempts to prevent brute-forcing this endpoint
+    const attempts = wrongLoginAttempts + 1
+    const shouldLock = attempts >= Number(config.max_wrong_attempts)
+
+    await User.findByIdAndUpdate(authId, {
+      $inc: { 'authentication.wrongLoginAttempts': 1 },
+      $set: {
+        'authentication.isRestricted': shouldLock,
+        ...(shouldLock && {
+          'authentication.restrictionLeftAt': new Date(
+            Date.now() + Number(config.restriction_minutes) * 60 * 1000,
+          ),
+        }),
+      },
+    })
+
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'The old password you provided is incorrect.',
+    )
   }
 
-  // Hash the new password
-  const hashedPassword = await bcrypt.hash(
-    newPassword,
-    Number(config.bcrypt_salt_rounds),
-  )
+  // 6. Success: Update Password
+  // Setting plain text because the Mongoose pre-save hook handles hashing
+  isUserExist.password = newPassword
 
-  // Update the password
-  await User.findByIdAndUpdate(
-    user.authId,
-    { password: hashedPassword },
-    { new: true },
-  )
+  // Set the timestamp to invalidate current JWTs
+  isUserExist.authentication.passwordChangedAt = new Date()
 
-  return { message: 'Password changed successfully' }
+  // Reset security counters
+  isUserExist.authentication.wrongLoginAttempts = 0
+  isUserExist.authentication.isRestricted = false
+  isUserExist.authentication.restrictionLeftAt = null
+
+  await isUserExist.save()
+
+  return {
+    message:
+      'Password changed successfully. Please log in again with your new credentials.',
+  }
 }
 
 export const CustomAuthServices = {
@@ -666,7 +877,6 @@ export const CustomAuthServices = {
   customLogin,
   getRefreshToken,
   socialLogin,
-  resendOtpToPhoneOrEmail,
   deleteAccount,
   resendOtp,
   changePassword,

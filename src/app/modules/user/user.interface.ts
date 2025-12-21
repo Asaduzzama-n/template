@@ -1,15 +1,10 @@
 import { HydratedDocument, Model, Types } from 'mongoose'
 
 type IAuthentication = {
+  isRestricted: boolean
   restrictionLeftAt: Date | null
-  resetPassword: boolean
-  wrongLoginAttempts: number
-  passwordChangedAt?: Date
-  oneTimeCode: string
-  latestRequestAt: Date
-  expiresAt?: Date
-  requestCount?: number
-  authType?: 'createAccount' | 'resetPassword'
+  wrongLoginAttempts: number | 0
+  passwordChangedAt?: Date | null
 }
 
 export type Point = {
@@ -30,8 +25,7 @@ export interface IUser {
   password: string
   role: string
   appId?: string
-  deviceToken?: string
-
+  fcmToken?: string
   authentication: IAuthentication
   createdAt: Date
   updatedAt: Date
@@ -43,6 +37,5 @@ export type UserModel = {
     savedPassword: string,
   ) => Promise<boolean>
 } & Model<IUser>
-
 
 export type UserDocument = HydratedDocument<IUser>

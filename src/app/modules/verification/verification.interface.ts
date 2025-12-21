@@ -1,6 +1,6 @@
 import { Model, Types } from 'mongoose';
 
-export enum TypeEnum {
+export enum VERIFICATION_TYPE {
   ACCOUNT_ACTIVATION = 'account_activation',
   RESET_PASSWORD = 'reset_password',
 }
@@ -8,12 +8,14 @@ export enum TypeEnum {
 
 export interface IVerification {
   _id?: Types.ObjectId;
-  type: TypeEnum;
+  type: VERIFICATION_TYPE;
   identifier:string
   otpHash: string;
   latestRequest: Date;
-  expiresAt: Date;
+  otpExpiresAt: Date;
   attempts: number;
+  requestCount:number;
+  expiresAt:Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

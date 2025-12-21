@@ -2,6 +2,8 @@ import crypto from 'crypto'
 import bcrypt from 'bcrypt'
 import config from '../config'
 
+const OTP_EXPIRY_MINUTES = 2
+
 const cryptoToken = () => {
   return crypto.randomBytes(32).toString('hex')
 }
@@ -18,7 +20,7 @@ export const compareOtp = async (otp: string, hashedOtp: string): Promise<boolea
 }
 export const generateOtp = async () => {
   const otp = crypto.randomInt(100000, 999999).toString()
-  const expiresIn = new Date(Date.now() + 2 * 60 * 1000)
+  const expiresIn = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000)
   const hashedOtp = await hashOtp(otp)
   return {otp, expiresIn, hashedOtp}
 }

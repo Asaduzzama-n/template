@@ -3,18 +3,26 @@ import catchAsync from '../../../../shared/catchAsync'
 import { CustomAuthServices } from './custom.auth.service'
 import sendResponse from '../../../../shared/sendResponse'
 import { StatusCodes } from 'http-status-codes'
+import config from '../../../../config'
+import { IAuthResponse } from '../auth.interface'
 
 const customLogin = catchAsync(async (req: Request, res: Response) => {
-  const { ...loginData } = req.body
+  const result = await CustomAuthServices.customLogin(req.body)
+  const { refreshToken, status, message, accessToken, role } = result
 
-  const result = await CustomAuthServices.customLogin(loginData)
-  const {status, message, accessToken, refreshToken, role} = result
+  if (refreshToken) {
+    res.cookie('refreshToken', refreshToken, {
+      secure: config.node_env === 'production',
+      httpOnly: true,
+      sameSite: 'strict',
+    })
+  }
 
-  sendResponse(res, {
+  sendResponse<Pick<IAuthResponse, 'accessToken' | 'role'>>(res, {
     statusCode: status,
     success: true,
     message: message,
-    data: {accessToken, refreshToken, role},
+    data: { accessToken, role },
   })
 })
 
@@ -22,23 +30,23 @@ const adminLogin = catchAsync(async (req: Request, res: Response) => {
   const { ...loginData } = req.body
 
   const result = await CustomAuthServices.adminLogin(loginData)
-  const {status, message, accessToken, refreshToken, role} = result
+  const { status, message, accessToken, refreshToken, role } = result
 
   sendResponse(res, {
     statusCode: status,
     success: true,
     message: message,
-    data: {accessToken, refreshToken, role},
+    data: { accessToken, refreshToken, role },
   })
 })
 
 const forgetPassword = catchAsync(async (req: Request, res: Response) => {
-  const { email, phone } = req.body
-  const result = await CustomAuthServices.forgetPassword(email.toLowerCase().trim(), phone)
+  const { email } = req.body
+  const result = await CustomAuthServices.forgetPassword(email)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: `An OTP has been sent to your ${email || phone}. Please verify your email.`,
+    message: `An OTP has been sent to your given email. Please verify your email.`,
     data: result,
   })
 })
@@ -56,15 +64,27 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
 })
 
 const verifyAccount = catchAsync(async (req: Request, res: Response) => {
-  const { oneTimeCode, phone, email } = req.body
+  const { oneTimeCode, type, email } = req.body
 
-  const result = await CustomAuthServices.verifyAccount(email, oneTimeCode)
-  const {status, message, accessToken, refreshToken, role, token} = result
-  sendResponse(res, {
+  const result = await CustomAuthServices.verifyAccount(
+    email,
+    oneTimeCode,
+    type,
+  )
+  const { status, message, accessToken, refreshToken, role, token } = result
+
+  if (refreshToken) {
+    res.cookie('refreshToken', refreshToken, {
+      secure: config.node_env === 'production',
+      httpOnly: true,
+      sameSite: 'strict',
+    })
+  }
+  sendResponse<Pick<IAuthResponse, 'accessToken' | 'role' | 'token'>>(res, {
     statusCode: status,
     success: true,
     message: message,
-    data: {accessToken, refreshToken, role, token},
+    data: { accessToken, role, token },
   })
 })
 
@@ -90,12 +110,8 @@ const resendOtp = catchAsync(async (req: Request, res: Response) => {
 })
 
 const changePassword = catchAsync(async (req: Request, res: Response) => {
-  const { currentPassword, newPassword } = req.body
-  const result = await CustomAuthServices.changePassword(
-    req.user!,
-    currentPassword,
-    newPassword,
-  )
+
+  const result = await CustomAuthServices.changePassword(req.user!, req.body)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -116,7 +132,7 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
 })
 const deleteAccount = catchAsync(async (req: Request, res: Response) => {
   const user = req.user
-  const {password} = req.body
+  const { password } = req.body
   const result = await CustomAuthServices.deleteAccount(user!, password)
   sendResponse(res, {
     statusCode: StatusCodes.OK,
@@ -126,16 +142,15 @@ const deleteAccount = catchAsync(async (req: Request, res: Response) => {
   })
 })
 
-
 const socialLogin = catchAsync(async (req: Request, res: Response) => {
-  const { appId, deviceToken } = req.body
-  const result = await CustomAuthServices.socialLogin(appId, deviceToken)
-  const {status, message, accessToken, refreshToken, role} = result
+  const { appId, fcmToken } = req.body
+  const result = await CustomAuthServices.socialLogin(appId, fcmToken)
+  const { status, message, accessToken, refreshToken, role } = result
   sendResponse(res, {
     statusCode: status,
     success: true,
     message: message,
-    data: {accessToken, refreshToken, role},
+    data: { accessToken, refreshToken, role },
   })
 })
 export const CustomAuthController = {
@@ -149,5 +164,5 @@ export const CustomAuthController = {
   createUser,
   deleteAccount,
   adminLogin,
-  socialLogin
+  socialLogin,
 }

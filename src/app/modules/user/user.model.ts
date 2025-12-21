@@ -14,7 +14,6 @@ const userSchema = new Schema<IUser, UserModel>(
       type: String,
       trim: true,
       unique: true,
-      index: true,
     },
     phone: {
       type: String,
@@ -45,6 +44,7 @@ const userSchema = new Schema<IUser, UserModel>(
       type: String,
     },
     location: {
+      select: false,
       type: {
         type: String,
         default: 'Point',
@@ -52,56 +52,35 @@ const userSchema = new Schema<IUser, UserModel>(
       },
       coordinates: {
         type: [Number],
-        default: [0.0, 0.0], // [longitude, latitude]
+        default: undefined, // [longitude, latitude]
+      },
+    },
+    authentication: {
+      select: false,
+      isRestricted: {
+        type: Boolean,
+        default: false,
+      },
+      restrictionLeftAt: {
+        type: Date,
+        default: null,
+      },
+      wrongLoginAttempts: {
+        type: Number,
+        default: 0,
+      },
+      passwordChangedAt: {
+        type: Date,
+        default: null,
       },
     },
     appId: {
       type: String,
-    },
-    deviceToken: {
-      type: String,
-    },
-    authentication: {
-      _id: false,
       select: false,
-      type: {
-        restrictionLeftAt: {
-          type: Date,
-          default: null,
-        },
-        resetPassword: {
-          type: Boolean,
-          default: false,
-        },
-        wrongLoginAttempts: {
-          type: Number,
-          default: 0,
-        },
-        passwordChangedAt: {
-          type: Date,
-          default: null,
-        },
-        oneTimeCode: {
-          type: String,
-          default: null,
-        },
-        latestRequestAt: {
-          type: Date,
-          default: null,
-        },
-        expiresAt: {
-          type: Date,
-          default: null,
-        },
-        requestCount: {
-          type: Number,
-          default: 0,
-        },
-        authType: {
-          type: String,
-          default: null,
-        },
-      },
+    },
+    fcmToken: {
+      type: String,
+      select: false,
     },
   },
   {

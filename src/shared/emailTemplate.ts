@@ -1,10 +1,11 @@
+import { VERIFICATION_TYPE } from '../app/modules/verification/verification.interface'
 import { ICreateAccount, IResetPassword } from '../interfaces/emailTemplate'
 
 const createAccount = (values: ICreateAccount) => {
   console.log(values, 'values')
   const data = {
     to: values.email,
-    subject: `Verify your account, ${values.name}`,
+    subject: `Verify your account, ${values.name ? values.name : 'Please.'}`,
     html: `
     <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0;">
       <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
@@ -73,9 +74,9 @@ const resendOtp = (values: {
   email: string
   name: string
   otp: string
-  type: 'resetPassword' | 'createAccount'
+  type: VERIFICATION_TYPE
 }) => {
-  const isReset = values.type === 'resetPassword'
+  const isReset = values.type === VERIFICATION_TYPE.RESET_PASSWORD
   const data = {
     to: values.email,
     subject: `${isReset ? 'Password Reset' : 'Account Verification'} - New Code`,

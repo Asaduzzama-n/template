@@ -9,10 +9,10 @@ import { AuthCommonServices } from '../common'
 
 const login = catchAsync(async (req: Request, res: Response) => {
   const user = req.user
-  const { deviceToken, password } = req.body
+  const { fcmToken, password } = req.body
 
   const result = await AuthCommonServices.handleLoginLogic(
-    { deviceToken: deviceToken, password: password },
+    { fcmToken: fcmToken, password: password },
     user as IUser,
   )
   const {status, message, accessToken, refreshToken, role} = result

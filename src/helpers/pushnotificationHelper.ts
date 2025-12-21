@@ -12,14 +12,14 @@ admin.initializeApp({
 type NotificationData = { [key: string]: string };
 
 export const sendPushNotification = async (
-  deviceToken: string,
+  fcmToken: string,
   title: string,
   body: string,
   data: NotificationData,
   icon?: string
 ) => {
   const message: admin.messaging.Message = {
-    token: deviceToken,
+    token: fcmToken,
     notification: { title, body },
     data,
     ...(icon && {

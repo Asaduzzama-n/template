@@ -9,136 +9,167 @@ import { IAuthResponse } from './auth.interface'
 import { IUser } from '../user/user.interface'
 import { emailTemplate } from '../../../shared/emailTemplate'
 import { emailHelper } from '../../../helpers/emailHelper'
+import { Verification } from '../verification/verification.model'
+import { VERIFICATION_TYPE } from '../verification/verification.interface'
+import config from '../../../config'
 
+const handleLoginLogic = async (
+  payload: ILoginData,
+  user: IUser,
+): Promise<IAuthResponse> => {
+  const {
+    _id,
+    email,
+    name,
+    role,
+    verified,
+    authentication,
+    password: hashedPassword,
+  } = user
 
-const handleLoginLogic = async (payload: ILoginData, isUserExist: IUser):Promise<IAuthResponse> => {
-  const { authentication, verified, status, password } = isUserExist
+  const {
+    isRestricted,
+    restrictionLeftAt,
+    wrongLoginAttempts = 0,
+  } = authentication || {}
 
-  const { restrictionLeftAt, wrongLoginAttempts } = authentication
-
-  const isPasswordMatched = await User.isPasswordMatched(
-    payload.password,
-    password,
-  )
-
-  if (!isPasswordMatched) {
-    isUserExist.authentication.wrongLoginAttempts = wrongLoginAttempts + 1
-
-    if (isUserExist.authentication.wrongLoginAttempts >= 5) {
-      isUserExist.status = USER_STATUS.RESTRICTED
-      isUserExist.authentication.restrictionLeftAt = new Date(
-        Date.now() + 10 * 60 * 1000,
-      ) // restriction for 10 minutes
-    }
-
-
-  if (!verified) {
-    //send otp to user
-    
-    const {otp,expiresIn,hashedOtp} =await generateOtp()
-
-    const authentication = {
-      email: payload.email,
-      oneTimeCode: otp,
-      expiresAt: expiresIn,
-      latestRequestAt: new Date(),
-      authType: 'createAccount',
-    }
-
-    await User.findByIdAndUpdate(isUserExist._id, {
-      $set: {
-        authentication,
-      },
-    })
-
-    const otpTemplate = emailTemplate.createAccount({
-      name: isUserExist.name!,
-      email: isUserExist.email!,
-      otp,
-    })
-
-    emailHelper.sendEmail(otpTemplate)
-
-    return authResponse(StatusCodes.PROXY_AUTHENTICATION_REQUIRED, `An OTP has been sent to your ${payload.email}. Please verify.`)
-
-  }
-
-  if (status === USER_STATUS.DELETED) {
+  // 1. Initial Lockout Check
+  if (isRestricted && restrictionLeftAt && new Date() < restrictionLeftAt) {
+    const remaining = Math.ceil(
+      (restrictionLeftAt.getTime() - Date.now()) / 60000,
+    )
     throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'No account found with this email',
+      StatusCodes.TOO_MANY_REQUESTS,
+      `Account temporarily locked. Try again in ${remaining} minutes.`,
     )
   }
 
-  if (status === USER_STATUS.RESTRICTED) {
-    if (restrictionLeftAt && new Date() < restrictionLeftAt) {
-      const remainingMinutes = Math.ceil(
-        (restrictionLeftAt.getTime() - Date.now()) / 60000,
+  // 2. Password Matching
+  const isMatch = await User.isPasswordMatched(payload.password, hashedPassword)
+
+  if (!isMatch) {
+    const attempts = wrongLoginAttempts + 1
+    const shouldLock = attempts >= Number(config.max_wrong_attempts)
+
+    const updateQuery: any = {
+      $inc: { 'authentication.wrongLoginAttempts': 1 },
+      $set: { 'authentication.isRestricted': shouldLock },
+    }
+
+    if (shouldLock) {
+      const lockUntil = new Date(
+        Date.now() + Number(config.restriction_minutes) * 60 * 1000,
       )
+
+      // Strategy Toggle: STRICT_EARLIEST (min) vs EXTEND (set)
+      if (config.lock_out_strategy === 'EXTEND') {
+        updateQuery.$min = { 'authentication.restrictionLeftAt': lockUntil }
+      } else {
+        updateQuery.$set['authentication.restrictionLeftAt'] = lockUntil
+      }
+    }
+
+    await User.findByIdAndUpdate(_id, updateQuery)
+
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Invalid credentials, please try again with valid one.',
+    )
+  }
+
+  // 3. Verification Check (Using UPSERT for Verification model)
+  if (!verified) {
+    const existingOTP = await Verification.findOne({
+      identifier: email,
+      type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION,
+    })
+
+   if (existingOTP) {
+    // A. Check Cooldown (Time-based)
+    if (existingOTP.latestRequest) {
+      const secondsSinceLast = (Date.now() - existingOTP.latestRequest.getTime()) / 1000;
+      if (secondsSinceLast < Number(config.otp_request_cooldown_seconds)) {
+        const waitTime = Math.ceil(Number(config.otp_request_cooldown_seconds) - secondsSinceLast);
+        throw new ApiError(StatusCodes.TOO_MANY_REQUESTS, `Please wait ${waitTime} seconds.`);
+      }
+    }
+
+    // B. Check Request Limit (Volume-based) - NEW
+    if (existingOTP.requestCount >= Number(config.max_otp_request_allowed || 5)) {
       throw new ApiError(
         StatusCodes.TOO_MANY_REQUESTS,
-        `You are restricted to login for ${remainingMinutes} minutes`,
-      )
+        'Maximum OTP limit reached. Please try again in 15 minutes.',
+      );
     }
-
-    // Handle restriction expiration
-    await User.findByIdAndUpdate(isUserExist._id, {
-      $set: {
-        authentication: { restrictionLeftAt: null, wrongLoginAttempts: 0 },
-        status: USER_STATUS.ACTIVE,
-      },
-    })
   }
 
+    const { otp, expiresIn, hashedOtp } = await generateOtp()
 
-    await User.findByIdAndUpdate(isUserExist._id, {
-      $set: {
-        status: isUserExist.status,
-        authentication: {
-          restrictionLeftAt: isUserExist.authentication.restrictionLeftAt,
-          wrongLoginAttempts: isUserExist.authentication.wrongLoginAttempts,
+    // Upsert ensures we don't crash on duplicate identity keys
+    await Verification.findOneAndUpdate(
+      { identifier: email, type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION },
+      {
+        $set: {
+          otpHash: hashedOtp,
+          otpExpiresAt: expiresIn,
+          latestRequest: new Date(),
+          attempts: 0, // IMPORTANT: Reset failed OTP attempts when a new one is sent
+          // Reset the TTL timer to 15 mins from NOW
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000),
         },
       },
-    })
-
-    throw new ApiError(
-      StatusCodes.BAD_REQUEST,
-      'Incorrect password, please try again.',
+      { upsert: true, new: true },
     )
+
+    // Offload to helper (consider using a queue here for true production scale)
+    emailHelper.sendEmail(emailTemplate.createAccount({ email, otp, name }))
+
+    return authResponse(StatusCodes.FORBIDDEN, 'Account unverified. OTP sent.')
   }
 
-  await User.findByIdAndUpdate(
-    isUserExist._id,
-    {
-      $set: {
-        deviceToken: payload.deviceToken,
-        authentication: {
-          restrictionLeftAt: null,
-          wrongLoginAttempts: 0,
-        },
-      },
+  // 4. Success - Reset Security Counters
+  await User.findByIdAndUpdate(_id, {
+    $set: {
+      'authentication.wrongLoginAttempts': 0,
+      'authentication.isRestricted': false,
+      'authentication.restrictionLeftAt': null,
+      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
     },
-    { new: true },
-  )
+  })
 
-  const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role, isUserExist.name, isUserExist.email)
+  const tokens = AuthHelper.createToken(_id, role, name, email)
 
-  return authResponse(StatusCodes.OK, `Welcome back ${isUserExist.name}`, isUserExist.role, tokens.accessToken, tokens.refreshToken)
+  // Best Practice: Return options as an object to keep code readable
+  return authResponse(StatusCodes.OK, `Welcome back ${name}`, {
+    role,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  })
 }
 
 export const AuthCommonServices = {
   handleLoginLogic,
 }
 
-
-
-export const authResponse = (status: number, message: string,role?: string, accessToken?: string, refreshToken?: string, token?: string): IAuthResponse => {
+export const authResponse = (
+  status: number,
+  message: string,
+  options: {
+    role?: string
+    accessToken?: string
+    refreshToken?: string
+    token?: string
+  } = {},
+): IAuthResponse => {
   return {
     status,
     message,
-    ...(role && { role }),
-    ...(accessToken && { accessToken }),
-    ...(refreshToken && { refreshToken }),
-    ...(token && { token }),
+    ...options,
   }
+}
+
+
+
+export const getSanitizeEmail = (email:string):string =>{
+  return email.toLowerCase().trim()
 }

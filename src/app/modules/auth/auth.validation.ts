@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { USER_ROLES } from '../../../enum/user'
+import { VERIFICATION_TYPE } from '../verification/verification.interface'
 
-const verifyEmailOrPhoneOtpZodSchema = z.object({
+const verifyAccountZodSchema = z.object({
   body: z.object({
     email: z
       .string()
@@ -9,25 +10,14 @@ const verifyEmailOrPhoneOtpZodSchema = z.object({
       .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
         message: 'Invalid email format',
       }),
-    phone: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-        message: 'Invalid phone number format',
-      }),
+    type: z.nativeEnum(VERIFICATION_TYPE),
     oneTimeCode: z.string().min(1, { message: 'OTP is required' }),
   }),
 })
 
 const forgetPasswordZodSchema = z.object({
   body: z.object({
-    email: z
-      .string()
-      .optional()
-
-      .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
-        message: 'Invalid email format',
-      }),
+    email: z.string().email({ message: 'Invalid email format.' }),
     phone: z
       .string()
       .optional()
@@ -47,40 +37,19 @@ const resetPasswordZodSchema = z.object({
 })
 
 const loginZodSchema = z.object({
-  body: z.object({
-    email: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
-        message: 'Invalid email format',
-      }),
-    phone: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-        message: 'Invalid phone number format',
-      }),
-    deviceToken: z.string().min(1).optional(),
-    password: z.string().min(8, { message: 'Password is required' }),
-  }),
-})
-
-const verifyAccountZodSchema = z.object({
-  body: z.object({
-    email: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
-        message: 'Invalid email format',
-      }),
-    phone: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-        message: 'Invalid phone number format',
-      }),
-    oneTimeCode: z.string().min(1, { message: 'OTP is required' }),
-  }),
+  body: z
+    .object({
+      email: z.string().email({ message: 'Invalid email format.' }),
+      phone: z
+        .string()
+        .optional()
+        .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
+          message: 'Invalid phone number format',
+        }),
+      fcmToken: z.string().min(1).optional(),
+      password: z.string().min(8, { message: 'Password is required' }),
+    })
+    .strict(),
 })
 
 const resendOtpZodSchema = z.object({
@@ -164,16 +133,15 @@ const createUserZodSchema = z.object({
 const socialLoginZodSchema = z.object({
   body: z.object({
     appId: z.string({ required_error: 'App ID is required' }),
-    deviceToken: z.string({ required_error: 'Device token is required' }),
+    fcmToken: z.string({ required_error: 'Device token is required' }),
   }),
 })
 
 export const AuthValidations = {
-  verifyEmailOrPhoneOtpZodSchema,
+  verifyAccountZodSchema,
   forgetPasswordZodSchema,
   resetPasswordZodSchema,
   loginZodSchema,
-  verifyAccountZodSchema,
   resendOtpZodSchema,
   changePasswordZodSchema,
   createUserZodSchema,
