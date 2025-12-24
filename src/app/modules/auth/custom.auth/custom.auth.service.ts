@@ -479,10 +479,10 @@ const getRefreshToken = async (token: string) => {
       config.jwt.jwt_refresh_secret as string,
     )
 
-    const { userId, iat } = decodedToken
+    const { authId, iat } = decodedToken
 
     // 2. Fetch User from DB (Critical for Enterprise)
-    const user = await User.findById(userId).select('+authentication').lean()
+    const user = await User.findById(authId).select('+authentication').lean()
 
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'User no longer exists.')
