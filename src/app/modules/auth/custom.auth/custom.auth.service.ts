@@ -255,7 +255,7 @@ const forgetPassword = async (email: string) => {
   })
 
   return config.node_env === 'development'
-    ? { email: isUserExist.email, otp, message: 'OTP generated (Dev Mode)' }
+    ? `An otp-${otp} is being sent to ${email}`
     : 'An OTP has been sent to your email. Please check your inbox.'
 }
 
@@ -268,7 +268,7 @@ const resetPassword = async (
 
   try {
     session.startTransaction()
-
+    console.log(payload, resetToken)
     // 2. Fetch and Validate Reset Token
     const isTokenExist = await Token.findOne({ token: resetToken }).session(
       session,
@@ -301,7 +301,8 @@ const resetPassword = async (
     if (user.status === USER_STATUS.RESTRICTED) {
       throw new ApiError(StatusCodes.FORBIDDEN, 'Your account is restricted.')
     }
-
+    console.log(user)
+    user.verified = true
     user.password = newPassword
     user.authentication.passwordChangedAt = new Date()
     user.authentication.wrongLoginAttempts = 0
@@ -326,6 +327,7 @@ const resetPassword = async (
   }
 }
 
+//TODO session related issue needs to be fixed
 const verifyAccount = async (
   email: string,
   onetimeCode: string,
@@ -686,12 +688,12 @@ const resendOtp = async (
 ) => {
   const sanitizedEmail = getSanitizeEmail(email)
 
+  console.log(email)
   // 1. Fetch User (Check if they are allowed to receive emails)
   const user = await User.findOne({
     email: sanitizedEmail,
     status: { $ne: USER_STATUS.DELETED },
   }).lean()
-
   if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Account not found.')
   }
@@ -765,7 +767,8 @@ const resendOtp = async (
     console.error('Email Resend Failed:', err)
   })
 
-  return 'A fresh OTP has been sent to your email.'
+  const returnMessage = config.node_env === 'development' ? `Use this otp-${otp} to verify your account` : `A fresh OTP has been sent to your email.`
+  return returnMessage
 }
 
 const changePassword = async (

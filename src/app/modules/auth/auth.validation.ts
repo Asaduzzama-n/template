@@ -10,9 +10,9 @@ const verifyAccountZodSchema = z.object({
       .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
         message: 'Invalid email format',
       }),
-    type: z.nativeEnum(VERIFICATION_TYPE),
+    type: z.nativeEnum(VERIFICATION_TYPE, { required_error: "Verification type is requried." }),
     oneTimeCode: z.string().min(1, { message: 'OTP is required' }),
-  }),
+  }).strict(),
 })
 
 const forgetPasswordZodSchema = z.object({
@@ -47,7 +47,7 @@ const loginZodSchema = z.object({
           message: 'Invalid phone number format',
         }),
       fcmToken: z.string().min(1).optional(),
-      password: z.string().min(8, { message: 'Password is required' }),
+      password: z.string().min(6, { message: "Password is required, and must be 6 character long." }),
     })
     .strict(),
 })
@@ -66,7 +66,8 @@ const resendOtpZodSchema = z.object({
       .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
         message: 'Invalid phone number format',
       }),
-    authType: z.string(z.enum(['resetPassword', 'createAccount']).optional()),
+    type: z.nativeEnum(VERIFICATION_TYPE, { required_error: "Verification type is requried." }),
+
   }),
 })
 

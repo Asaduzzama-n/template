@@ -4,50 +4,58 @@ import { Secret } from 'jsonwebtoken'
 import config from '../../config'
 import { jwtHelper } from '../../helpers/jwtHelper'
 import ApiError from '../../errors/ApiError'
+import { USER_ROLES } from '../../enum/user'
 
 const auth =
   (...roles: string[]) =>
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const tokenWithBearer = req.headers.authorization
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tokenWithBearer = req.headers.authorization
 
-      if (!tokenWithBearer) {
-        throw new ApiError(StatusCodes.NOT_FOUND, 'Token not found!')
-      }
-
-      if (tokenWithBearer && tokenWithBearer.startsWith('Bearer')) {
-        const token = tokenWithBearer.split(' ')[1]
-
-        try {
-          // Verify token
-          const verifyUser = jwtHelper.verifyToken(
-            token,
-            config.jwt.jwt_secret as Secret,
-          )
-
-          // Set user to header
-          req.user = verifyUser
-
-          // Guard user
-          if (roles.length && !roles.includes(verifyUser.role)) {
-            throw new ApiError(
-              StatusCodes.FORBIDDEN,
-              "You don't have permission to access this API",
-            )
+        if (!tokenWithBearer) {
+          if (roles.includes(USER_ROLES.GUEST)) {
+            req.user = {
+              role: USER_ROLES.GUEST,
+            }
+            return next()
           }
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Token not found!')
 
-          next()
-        } catch (error) {
-          if (error instanceof Error && error.name === 'TokenExpiredError') {
-            throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
-          }
-          throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
         }
+
+        if (tokenWithBearer && tokenWithBearer.startsWith('Bearer')) {
+          const token = tokenWithBearer.split(' ')[1]
+
+          try {
+            // Verify token
+            const verifyUser = jwtHelper.verifyToken(
+              token,
+              config.jwt.jwt_secret as Secret,
+            )
+
+            // Set user to header
+            req.user = verifyUser
+
+            // Guard user
+            if (roles.length && !roles.includes(verifyUser.role)) {
+              throw new ApiError(
+                StatusCodes.FORBIDDEN,
+                "You don't have permission to access this API",
+              )
+            }
+
+            next()
+          } catch (error) {
+            if (error instanceof Error && error.name === 'TokenExpiredError') {
+              throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
+            }
+            throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
+          }
+        }
+      } catch (error) {
+        next(error)
       }
-    } catch (error) {
-      next(error)
     }
-  }
 
 export default auth
 
@@ -58,44 +66,44 @@ export default auth
 
 export const tempAuth =
   (...roles: string[]) =>
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const tokenWithBearer = req.headers.authorization
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const tokenWithBearer = req.headers.authorization
 
-      if (!tokenWithBearer) {
-        throw new ApiError(StatusCodes.NOT_FOUND, 'Token not found!')
-      }
-
-      if (tokenWithBearer && tokenWithBearer.startsWith('Bearer')) {
-        const token = tokenWithBearer.split(' ')[1]
-
-        try {
-          // Verify token
-          const verifyUser = jwtHelper.verifyToken(
-            token,
-            config.jwt.temp_jwt_secret as Secret,
-          )
-
-          // Set user to header
-          req.user = verifyUser
-
-          // Guard user
-          if (roles.length && !roles.includes(verifyUser.role)) {
-            throw new ApiError(
-              StatusCodes.FORBIDDEN,
-              "You don't have permission to access this API",
-            )
-          }
-
-          next()
-        } catch (error) {
-          if (error instanceof Error && error.name === 'TokenExpiredError') {
-            throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
-          }
-          throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
+        if (!tokenWithBearer) {
+          throw new ApiError(StatusCodes.NOT_FOUND, 'Token not found!')
         }
+
+        if (tokenWithBearer && tokenWithBearer.startsWith('Bearer')) {
+          const token = tokenWithBearer.split(' ')[1]
+
+          try {
+            // Verify token
+            const verifyUser = jwtHelper.verifyToken(
+              token,
+              config.jwt.temp_jwt_secret as Secret,
+            )
+
+            // Set user to header
+            req.user = verifyUser
+
+            // Guard user
+            if (roles.length && !roles.includes(verifyUser.role)) {
+              throw new ApiError(
+                StatusCodes.FORBIDDEN,
+                "You don't have permission to access this API",
+              )
+            }
+
+            next()
+          } catch (error) {
+            if (error instanceof Error && error.name === 'TokenExpiredError') {
+              throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
+            }
+            throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
+          }
+        }
+      } catch (error) {
+        next(error)
       }
-    } catch (error) {
-      next(error)
     }
-  }

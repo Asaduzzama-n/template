@@ -7,6 +7,7 @@ import { USER_ROLES, USER_STATUS } from '../../../enum/user'
 
 import { JwtPayload } from 'jsonwebtoken'
 import { logger } from '../../../shared/logger'
+import config from '../../../config'
 
 
 
@@ -29,9 +30,9 @@ const updateProfile = async (user: JwtPayload, payload: Partial<IUser>) => {
 
 const createAdmin = async (): Promise<Partial<IUser> | null> => {
   const admin = {
-    email: 'hcf@gmail.com',
-    name: 'Andrea',
-    password: '12345678',
+    email: config.admin.email,
+    name: 'Admin',
+    password: config.admin.password,
     role: USER_ROLES.ADMIN,
     status: USER_STATUS.ACTIVE,
     verified: true,
@@ -60,4 +61,4 @@ const createAdmin = async (): Promise<Partial<IUser> | null> => {
   return result[0]
 }
 
-export const UserServices = {  updateProfile, createAdmin }
+export const UserServices = { updateProfile, createAdmin }

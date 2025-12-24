@@ -44,7 +44,6 @@ const userSchema = new Schema<IUser, UserModel>(
       type: String,
     },
     location: {
-      select: false,
       type: {
         type: String,
         default: 'Point',
@@ -52,27 +51,30 @@ const userSchema = new Schema<IUser, UserModel>(
       },
       coordinates: {
         type: [Number],
-        default: undefined, // [longitude, latitude]
+        default: [0.0, 0.0],
       },
     },
     authentication: {
+      type: {
+        isRestricted: {
+          type: Boolean,
+          default: false,
+        },
+        restrictionLeftAt: {
+          type: Date,
+          default: null,
+        },
+        wrongLoginAttempts: {
+          type: Number,
+          default: 0,
+        },
+        passwordChangedAt: {
+          type: Date,
+          default: null,
+        },
+      },
+      default: {},
       select: false,
-      isRestricted: {
-        type: Boolean,
-        default: false,
-      },
-      restrictionLeftAt: {
-        type: Date,
-        default: null,
-      },
-      wrongLoginAttempts: {
-        type: Number,
-        default: 0,
-      },
-      passwordChangedAt: {
-        type: Date,
-        default: null,
-      },
     },
     appId: {
       type: String,

@@ -11,6 +11,10 @@ export default {
   bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
   firebase_service_account_base64: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
   platform_name: process.env.PLATFORM_NAME,
+  admin: {
+    email: process.env.ADMIN_EMAIL,
+    password: process.env.ADMIN_PASSWORD
+  },
   google: {
     client_id: process.env.GOOGLE_CLIENT_ID,
     client_secret: process.env.GOOGLE_CLIENT_SECRET,
@@ -58,5 +62,5 @@ export default {
   restriction_minutes: process.env.RESTRICTION_MINUTES,
   otp_request_cooldown_seconds: process.env.OTP_REQUEST_COOLDOWN_SECONDS,
   max_otp_attempts: process.env.MAX_OTP_ATTEMPTS,
-  max_otp_request_allowed:process.env.MAX_OTP_REQUEST_ALLOWED
+  max_otp_request_allowed: process.env.MAX_OTP_REQUEST_ALLOWED
 }
