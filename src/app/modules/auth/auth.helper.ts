@@ -36,8 +36,8 @@ const tempAccessToken = (
 ) => {
   const accessToken = jwtHelper.createToken(
     { authId, role, name, email, profile, fcmToken },
-    'asjdhashd#$uaas98',
-    config.jwt.jwt_expire_in as string,
+    config.jwt.temp_jwt_secret as Secret,
+    config.jwt.temp_jwt_expire_in as string,
   )
 
   return { accessToken }

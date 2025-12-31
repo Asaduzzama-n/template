@@ -17,7 +17,7 @@ export const sendNotification = async (
 ) => {
   try {
     const result = await Notification.create({
-      from,
+      from: from.authId,
       to,
       title,
       body,
@@ -45,8 +45,8 @@ export const sendNotification = async (
 
     socket.emit('notification', socketResponse)
 
-    if(fcmToken){
-     await sendPushNotification(fcmToken, title, body, { from: from.authId, to })
+    if (fcmToken) {
+      await sendPushNotification(fcmToken, title, body, { from: from.authId, to })
     }
   } catch (err) {
     //@ts-ignore

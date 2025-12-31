@@ -5,12 +5,9 @@ import { VERIFICATION_TYPE } from '../verification/verification.interface'
 const verifyAccountZodSchema = z.object({
   body: z.object({
     email: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
-        message: 'Invalid email format',
-      }),
-    type: z.nativeEnum(VERIFICATION_TYPE, { required_error: "Verification type is requried." }),
+      .string({ required_error: 'Email is required' })
+      .email({ message: 'Invalid email format' }),
+    type: z.nativeEnum(VERIFICATION_TYPE, { required_error: "Verification type is required." }),
     oneTimeCode: z.string().min(1, { message: 'OTP is required' }),
   }).strict(),
 })
@@ -40,12 +37,6 @@ const loginZodSchema = z.object({
   body: z
     .object({
       email: z.string().email({ message: 'Invalid email format.' }),
-      phone: z
-        .string()
-        .optional()
-        .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-          message: 'Invalid phone number format',
-        }),
       fcmToken: z.string().min(1).optional(),
       password: z.string().min(6, { message: "Password is required, and must be 6 character long." }),
     })
@@ -59,12 +50,6 @@ const resendOtpZodSchema = z.object({
       .optional()
       .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
         message: 'Invalid email format',
-      }),
-    phone: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-        message: 'Invalid phone number format',
       }),
     type: z.nativeEnum(VERIFICATION_TYPE, { required_error: "Verification type is requried." }),
 
@@ -81,7 +66,7 @@ const changePasswordZodSchema = z.object({
         .string({
           required_error: 'New password is required',
         })
-        .min(8, 'Password must be at least 8 characters'),
+        .min(6, 'Password must be at least 6 characters'),
       confirmPassword: z.string({
         required_error: 'Confirm password is required',
       }),

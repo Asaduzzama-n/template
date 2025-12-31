@@ -7,7 +7,6 @@ import config from '../../../../config'
 import { IAuthResponse } from '../auth.interface'
 
 const customLogin = catchAsync(async (req: Request, res: Response) => {
-  console.log(req.body)
   const result = await CustomAuthServices.customLogin(req.body)
 
   const { refreshToken, status, message, accessToken, role } = result
@@ -102,8 +101,7 @@ const getRefreshToken = catchAsync(async (req: Request, res: Response) => {
 })
 
 const resendOtp = catchAsync(async (req: Request, res: Response) => {
-  const { email, phone, type } = req.body
-  console.log(req.body)
+  const { email, type } = req.body
   const result = await CustomAuthServices.resendOtp(email, type)
   sendResponse(res, {
     statusCode: StatusCodes.OK,

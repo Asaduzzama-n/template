@@ -20,6 +20,7 @@ import {
 } from '../../verification/verification.interface'
 import mongoose from 'mongoose'
 import { Verification } from '../../verification/verification.model'
+import { VerificationService } from '../../verification/verification.service'
 
 //done
 const createUser = async (payload: IUser) => {
@@ -32,12 +33,13 @@ const createUser = async (payload: IUser) => {
 
     const { otp, expiresIn, hashedOtp } = await generateOtp()
 
-    const authentication: Omit<IVerification, 'expiresAt' | 'requestCount'> = {
+    const authentication: Omit<IVerification, 'expiresAt'> = {
       identifier: payload.email,
       otpHash: hashedOtp,
       otpExpiresAt: expiresIn,
       latestRequest: new Date(),
-      attempts: 1,
+      attempts: 0,
+      requestCount: 1,
       type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION,
     }
 
@@ -188,59 +190,16 @@ const forgetPassword = async (email: string) => {
     )
   }
 
-  // 3. Cooldown & Brute Force Check (Verification Model)
-  const existingVerification = await Verification.findOne({
-    identifier: isUserExist.email,
-    type: VERIFICATION_TYPE.RESET_PASSWORD,
-  }).lean()
+  // 3. Use reusable OTP rate limiting utility
+  await VerificationService.validateOtpRequest(
+    isUserExist.email!,
+    VERIFICATION_TYPE.RESET_PASSWORD,
+  )
 
-  if (existingVerification) {
-    const timeSinceLastRequest =
-      (Date.now() - existingVerification.latestRequest.getTime()) / 1000
-    const waitTime = Math.ceil(
-      Number(config.otp_request_cooldown_seconds) - timeSinceLastRequest,
-    )
-    if (existingVerification.latestRequest) {
-      const secondsSinceLast =
-        (Date.now() - existingVerification.latestRequest.getTime()) / 1000
-      if (secondsSinceLast < Number(config.otp_request_cooldown_seconds)) {
-        throw new ApiError(
-          StatusCodes.TOO_MANY_REQUESTS,
-          `Please wait ${waitTime} seconds before requesting a new OTP.`,
-        )
-      }
-    }
-
-    // Check Request Limit - NEW
-    if (
-      existingVerification.requestCount >=
-      Number(config.max_otp_request_allowed || 5)
-    ) {
-      throw new ApiError(
-        StatusCodes.TOO_MANY_REQUESTS,
-        'Maximum reset attempts reached. Try again in 15 minutes.',
-      )
-    }
-  }
-
-  // 4. Generate OTP
-  const { otp, expiresIn, hashedOtp } = await generateOtp()
-
-  // 5. Atomic Upsert to Verification Model (Correct Approach)
-  // This manages the cooldown and the OTP data in one place
-  await Verification.findOneAndUpdate(
-    { identifier: isUserExist.email, type: VERIFICATION_TYPE.RESET_PASSWORD },
-    {
-      $set: {
-        otpHash: hashedOtp,
-        otpExpiresAt: expiresIn,
-        latestRequest: new Date(),
-        // We set the TTL index 'expiresAt' to 15 mins from NOW
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      },
-      $inc: { attempts: 0 }, // Reset attempts for a new OTP
-    },
-    { upsert: true, new: true },
+  // 4. Generate and store OTP using reusable utility
+  const { otp } = await VerificationService.upsertVerification(
+    isUserExist.email!,
+    VERIFICATION_TYPE.RESET_PASSWORD,
   )
 
   // 6. Send Email (Fire and forget or use a Job Queue)
@@ -268,7 +227,6 @@ const resetPassword = async (
 
   try {
     session.startTransaction()
-    console.log(payload, resetToken)
     // 2. Fetch and Validate Reset Token
     const isTokenExist = await Token.findOne({ token: resetToken }).session(
       session,
@@ -301,7 +259,7 @@ const resetPassword = async (
     if (user.status === USER_STATUS.RESTRICTED) {
       throw new ApiError(StatusCodes.FORBIDDEN, 'Your account is restricted.')
     }
-    console.log(user)
+
     user.verified = true
     user.password = newPassword
     user.authentication.passwordChangedAt = new Date()
@@ -327,7 +285,7 @@ const resetPassword = async (
   }
 }
 
-//TODO session related issue needs to be fixed
+
 const verifyAccount = async (
   email: string,
   onetimeCode: string,
@@ -397,8 +355,6 @@ const verifyAccount = async (
       await session.commitTransaction() // Save the failed attempt count
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid OTP.')
     }
-
-    // --- LOGIC BRANCHES ---
 
     // A. ACCOUNT ACTIVATION
     if (verification.type === VERIFICATION_TYPE.ACCOUNT_ACTIVATION) {
@@ -488,7 +444,7 @@ const getRefreshToken = async (token: string) => {
       throw new ApiError(StatusCodes.NOT_FOUND, 'User no longer exists.')
     }
 
-    // 3. Security Check: Admin Restriction
+
     if (user.status === USER_STATUS.DELETED) {
       throw new ApiError(StatusCodes.FORBIDDEN, 'Account has been deleted.')
     }
@@ -500,8 +456,6 @@ const getRefreshToken = async (token: string) => {
       )
     }
 
-    // 4. Security Check: Password Change Invalidation
-    // If password was changed after this refresh token was issued, reject it.
     if (
       user.authentication?.passwordChangedAt &&
       AuthHelper.isTokenInvalidated(user.authentication.passwordChangedAt, iat!)
@@ -688,7 +642,6 @@ const resendOtp = async (
 ) => {
   const sanitizedEmail = getSanitizeEmail(email)
 
-  console.log(email)
   // 1. Fetch User (Check if they are allowed to receive emails)
   const user = await User.findOne({
     email: sanitizedEmail,
@@ -705,7 +658,10 @@ const resendOtp = async (
     )
   }
 
-  // 2. Fetch Existing Verification Record
+  // 2. Validate rate limits using reusable utility (checks both cooldown and request limit)
+  await VerificationService.validateOtpRequest(sanitizedEmail, authType)
+
+  // 3. Check if verification session exists
   const existingVerification = await Verification.findOne({
     identifier: sanitizedEmail,
     type: authType,
@@ -717,42 +673,11 @@ const resendOtp = async (
       'No active session found. Please try the original action again.',
     )
   }
-  const OTP_RESEND_COOLDOWN = Number(config.otp_request_cooldown_seconds)
-  // 3. Cooldown Logic (Time-based check)
-  const secondsSinceLastRequest =
-    (Date.now() - existingVerification.latestRequest.getTime()) / 1000
-  if (secondsSinceLastRequest < OTP_RESEND_COOLDOWN) {
-    const waitTime = Math.ceil(OTP_RESEND_COOLDOWN - secondsSinceLastRequest)
-    throw new ApiError(
-      StatusCodes.TOO_MANY_REQUESTS,
-      `Please wait ${waitTime} seconds before requesting a new OTP.`,
-    )
-  }
 
-  // 4. Hard Limit Logic (Request count check)
-  if (existingVerification.attempts >= Number(config.max_otp_attempts)) {
-    throw new ApiError(
-      StatusCodes.TOO_MANY_REQUESTS,
-      'Maximum OTP resend limit reached. Please try again after 15 minutes.',
-    )
-  }
-
-  const { otp, expiresIn, hashedOtp } = await generateOtp()
-
-  // 6. Atomic Update
-  await Verification.findOneAndUpdate(
-    { identifier: sanitizedEmail, type: authType },
-    {
-      $set: {
-        otpHash: hashedOtp,
-        otpExpiresAt: expiresIn,
-        latestRequest: new Date(),
-        attempts: 0, // Reset failed guessing attempts for the new code
-        // Refresh the 15-minute TTL so the document doesn't disappear
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      },
-      $inc: { requestCount: 1 }, // Increment the total requests for this session
-    },
+  // 4. Generate and store new OTP using reusable utility
+  const { otp } = await VerificationService.upsertVerification(
+    sanitizedEmail,
+    authType,
   )
 
   // 7. Send Email
