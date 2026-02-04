@@ -4,8 +4,6 @@ export type IGenericResponse<T> = {
     limit: number
     total: number
     totalPage: number
-    currentPage?: number
-    numberOfPages?: number
   }
   data: T
 }

@@ -20,15 +20,15 @@ export const onlineUsers = new Map()
 let server: any
 async function main() {
   try {
-    mongoose.connect(config.database_url as string)
+    mongoose.connect(config.database.url as string)
     logger.info(colors.green('🚀 Database connected successfully'))
 
     const port =
-      typeof config.port === 'number' ? config.port : Number(config.port)
+      typeof config.app.port === 'number' ? config.app.port : Number(config.app.port)
 
-    server = app.listen(port, config.ip_address as string, () => {
+    server = app.listen(port, config.app.ip_address as string, () => {
       logger.info(
-        colors.yellow(`♻️  Application listening on port:${config.port}`),
+        colors.yellow(`♻️  Application listening on port:${config.app.port}`),
       )
     })
 
@@ -45,12 +45,12 @@ async function main() {
 
 
     socketHelper.socket(io)
-    setSocketIO(io) 
-    
+    setSocketIO(io)
+
 
   } catch (error) {
     errorLogger.error(colors.red('🤢 Failed to connect Database'))
-    config.node_env === 'development' && console.log(error)
+    config.app.node_env === 'development' && console.log(error)
   }
 
   //handle unhandleRejection

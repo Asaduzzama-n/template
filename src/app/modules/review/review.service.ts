@@ -7,33 +7,41 @@ import mongoose from 'mongoose';
 import { User } from '../user/user.model';
 import { IPaginationOptions } from '../../../interfaces/pagination';
 import { paginationHelper } from '../../../helpers/paginationHelper';
+import { USER_ROLES } from '../../../enum/user';
+import { logger } from '../../../shared/logger';
 
-
-const createReview = async (user:JwtPayload,payload: IReview) => {
+const createReview = async (user: JwtPayload, payload: IReview) => {
   payload.reviewer = user.authId;
+
+  // Prevent self-review
+  if (payload.reviewee.toString() === user.authId) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'You cannot review yourself.');
+  }
+
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    const result = await Review.create([payload],{session});
-    if(!result){
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create Review, please try again later.')
+    const result = await Review.create([payload], { session });
+    if (!result || result.length === 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create Review, please try again later.');
     }
-    //now update the review count of the user
+
+    // Update the review count and rating of the reviewee
     await User.findByIdAndUpdate(
       payload.reviewee,
       [
         {
           $set: {
-            totalReview: { $add: [ { $ifNull: ['$totalReview', 0] }, 1 ] },
+            totalReview: { $add: [{ $ifNull: ['$totalReview', 0] }, 1] },
             rating: {
               $divide: [
                 {
                   $add: [
-                    { $multiply: [ { $ifNull: ['$rating', 0] }, { $ifNull: ['$totalReview', 0] } ] },
+                    { $multiply: [{ $ifNull: ['$rating', 0] }, { $ifNull: ['$totalReview', 0] }] },
                     payload.rating
                   ]
                 },
-                { $add: [ { $ifNull: ['$totalReview', 0] }, 1 ] }
+                { $add: [{ $ifNull: ['$totalReview', 0] }, 1] }
               ]
             }
           }
@@ -46,27 +54,34 @@ const createReview = async (user:JwtPayload,payload: IReview) => {
     return result[0];
   } catch (error) {
     await session.abortTransaction();
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create Review, please try again later.')
-  }finally {
+    logger.error('createReview error:', error);
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to create Review, please try again later.');
+  } finally {
     await session.endSession();
   }
 };
 
-const getAllReviews = async (user:JwtPayload, type:'reviewer' | 'reviewee', paginationOptions:IPaginationOptions) => {
-  const {page,limit,skip,sortBy,sortOrder} = paginationHelper.calculatePagination(paginationOptions);
-
-
-  const cacheKey = `reviews:${type}:${user.authId}:page:${page}:limit:${limit}:sort:${sortBy}:${sortOrder}`;
-
+const getAllReviews = async (
+  user: JwtPayload,
+  type: 'reviewer' | 'reviewee',
+  paginationOptions: IPaginationOptions
+) => {
+  const { page, limit, skip, sortBy, sortOrder } = paginationHelper.calculatePagination(paginationOptions);
 
   const [result, total] = await Promise.all([
-    Review.find({[type]:user.authId}).populate('reviewer').populate('reviewee').skip(skip).limit(limit).sort({[sortBy]:sortOrder}),
-    Review.countDocuments({[type]:user.authId})
+    Review.find({ [type]: user.authId })
+      .populate('reviewer', 'name lastName fullName profile')
+      .populate('reviewee', 'name lastName fullName profile')
+      .skip(skip)
+      .limit(limit)
+      .sort({ [sortBy]: sortOrder })
+      .lean(),
+    Review.countDocuments({ [type]: user.authId })
   ]);
 
-
   return {
-    meta:{
+    meta: {
       page,
       limit,
       total,
@@ -75,7 +90,6 @@ const getAllReviews = async (user:JwtPayload, type:'reviewer' | 'reviewee', pagi
     data: result
   };
 };
-
 
 const updateReview = async (
   user: JwtPayload,
@@ -89,42 +103,50 @@ const updateReview = async (
     const existingReview = await Review.findById(id).session(session);
 
     if (!existingReview) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found, please try again later.');
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found.');
     }
-    if(existingReview?.reviewer.toString() !== user.authId){
-      throw new ApiError(StatusCodes.UNAUTHORIZED, 'You are not authorized to update this review.');
+
+    // Allow admin to update any review, users can only update their own
+    const isOwner = existingReview.reviewer.toString() === user.authId;
+    const isAdmin = user.role === USER_ROLES.ADMIN;
+
+    if (!isOwner && !isAdmin) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'You are not authorized to update this review.');
     }
+
     const oldRating = existingReview.rating;
     const newRating = payload.rating ?? oldRating;
 
-    // Update user rating
-    await User.findByIdAndUpdate(
-      existingReview.reviewee,
-      [
-        {
-          $set: {
-            rating: {
-              $cond: [
-                { $eq: ['$totalReview', 0] },
-                0,
-                {
-                  $divide: [
-                    {
-                      $add: [
-                        { $subtract: [ { $multiply: ['$rating', '$totalReview'] }, oldRating ] },
-                        newRating
-                      ]
-                    },
-                    '$totalReview'
-                  ]
-                }
-              ]
+    // Update user rating only if rating changed
+    if (payload.rating !== undefined && payload.rating !== oldRating) {
+      await User.findByIdAndUpdate(
+        existingReview.reviewee,
+        [
+          {
+            $set: {
+              rating: {
+                $cond: [
+                  { $eq: ['$totalReview', 0] },
+                  0,
+                  {
+                    $divide: [
+                      {
+                        $add: [
+                          { $subtract: [{ $multiply: ['$rating', '$totalReview'] }, oldRating] },
+                          newRating
+                        ]
+                      },
+                      '$totalReview'
+                    ]
+                  }
+                ]
+              }
             }
           }
-        }
-      ],
-      { session, new: true }
-    );
+        ],
+        { session, new: true }
+      );
+    }
 
     // Update review document
     if (payload.rating !== undefined) existingReview.rating = newRating;
@@ -133,11 +155,11 @@ const updateReview = async (
     await existingReview.save({ session });
     await session.commitTransaction();
 
-
-
-    return "Review updated successfully";
+    return 'Review updated successfully';
   } catch (error) {
     await session.abortTransaction();
+    logger.error('updateReview error:', error);
+    if (error instanceof ApiError) throw error;
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Update review failed.');
   } finally {
     await session.endSession();
@@ -151,11 +173,15 @@ const deleteReview = async (id: string, user: JwtPayload) => {
 
     const existingReview = await Review.findById(id).session(session);
     if (!existingReview) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found, please try again later.');
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Review not found.');
     }
 
-    if (existingReview.reviewer.toString() !== user.authId) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, 'You are not authorized to delete this review.');
+    // Allow admin to delete any review, users can only delete their own
+    const isOwner = existingReview.reviewer.toString() === user.authId;
+    const isAdmin = user.role === USER_ROLES.ADMIN;
+
+    if (!isOwner && !isAdmin) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'You are not authorized to delete this review.');
     }
 
     // Update reviewee's rating and totalReview
@@ -165,15 +191,15 @@ const deleteReview = async (id: string, user: JwtPayload) => {
         {
           $set: {
             totalReview: {
-              $max: [{ $add: ['$totalReview', -1] }, 0] // avoid negative count
+              $max: [{ $add: ['$totalReview', -1] }, 0]
             },
             rating: {
               $cond: [
-                { $lte: ['$totalReview', 1] }, // if after deletion totalReview will be 0 or less
+                { $lte: ['$totalReview', 1] },
                 0,
                 {
                   $divide: [
-                    { $subtract: [ { $multiply: ['$rating', '$totalReview'] }, existingReview.rating ] },
+                    { $subtract: [{ $multiply: ['$rating', '$totalReview'] }, existingReview.rating] },
                     { $add: ['$totalReview', -1] }
                   ]
                 }
@@ -186,18 +212,18 @@ const deleteReview = async (id: string, user: JwtPayload) => {
     );
 
     await existingReview.deleteOne({ session });
-
     await session.commitTransaction();
 
-    return "Review deleted successfully";
+    return 'Review deleted successfully';
   } catch (error) {
     await session.abortTransaction();
+    logger.error('deleteReview error:', error);
+    if (error instanceof ApiError) throw error;
     throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Delete review failed.');
   } finally {
     await session.endSession();
   }
 };
-
 
 export const ReviewServices = {
   createReview,
@@ -205,3 +231,4 @@ export const ReviewServices = {
   updateReview,
   deleteReview,
 };
+

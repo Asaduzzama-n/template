@@ -83,7 +83,7 @@ const uploadMultipleFilesToS3 = async (
         .toBuffer()
 
       const params = {
-        Bucket: process.env.AWS_BUCKET_NAME!,
+        Bucket: config.aws.bucket_name,
         Key: fileKey,
         Body: optimizedImage, // Upload optimized image
         ContentType: file.mimetype,
@@ -93,7 +93,7 @@ const uploadMultipleFilesToS3 = async (
       await s3Client.send(command)
       return getPublicUri(fileKey)
     } catch (error) {
-      console.error('Error uploading file to S3:', error)
+      logger.error('Error uploading file to S3:', error)
       return null // Instead of throwing, return null to continue with other uploads
     }
   })

@@ -2,7 +2,7 @@
 import { ErrorRequestHandler, NextFunction, Request, Response } from 'express'
 import config from '../../config'
 import { IGenericErrorMessage } from '../../interfaces/error'
-import handleValidationError from '../../errors/handleZodError'
+import handleValidationError from '../../errors/handleValidationError'
 import { ZodError } from 'zod'
 import handleZodError from '../../errors/handleZodError'
 import handleCastError from '../../errors/handleCastError'
@@ -14,15 +14,15 @@ const globalErrorHandler: ErrorRequestHandler = (
   res: Response,
   next: NextFunction,
 ) => {
-  // config.node_env === 'development'
+  // config.app.node_env === 'development'
   //   ? console.log('Inside Global Error Handler🪐', error)
   //   : console.log('Inside Global Error Handler🪐', error)
 
   let statusCode = 500
-  let message = 'Something wen wrong!'
+  let message = 'Something went wrong!'
   let errorMessages: IGenericErrorMessage[] = []
 
-  if (error?.name === 'validationError') {
+  if (error?.name === 'ValidationError') {
     const simplifiedError = handleValidationError(error)
     statusCode = simplifiedError.statusCode
     message = simplifiedError.errorMessages[0].message
@@ -54,7 +54,7 @@ const globalErrorHandler: ErrorRequestHandler = (
     success: false,
     message: message,
     errorMessages,
-    stack: config.node_env === 'production' ? undefined : error?.stack,
+    stack: config.app.node_env === 'production' ? undefined : error?.stack,
   })
 }
 

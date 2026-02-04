@@ -2,7 +2,6 @@ import { VERIFICATION_TYPE } from '../app/modules/verification/verification.inte
 import { ICreateAccount, IResetPassword } from '../interfaces/emailTemplate'
 
 const createAccount = (values: ICreateAccount) => {
-  console.log(values, 'values')
   const data = {
     to: values.email,
     subject: `Verify your account, ${values.name ? values.name : 'Please.'}`,
@@ -26,7 +25,7 @@ const createAccount = (values: ICreateAccount) => {
         </tr>
         <tr>
           <td style="padding: 20px 40px; text-align: center; color: #999999; font-size: 14px;">
-            <p>&copy; 2024 Your Company. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
           </td>
         </tr>
       </table>
@@ -60,7 +59,7 @@ const resetPassword = (values: IResetPassword) => {
         </tr>
         <tr>
           <td style="padding: 20px 40px; text-align: center; color: #999999; font-size: 14px;">
-            <p>&copy; 2024 Your Company. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
           </td>
         </tr>
       </table>
@@ -111,7 +110,7 @@ const resendOtp = (values: {
         </tr>
         <tr>
           <td style="padding: 20px 40px; text-align: center; color: #999999; font-size: 14px; border-top: 1px solid #eeeeee;">
-            <p>&copy; 2024 Your Company. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} Your Company. All rights reserved.</p>
           </td>
         </tr>
       </table>

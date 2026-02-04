@@ -9,19 +9,19 @@ import { AuthCommonServices } from '../common'
 
 const login = catchAsync(async (req: Request, res: Response) => {
   const user = req.user
-  const { fcmToken, password } = req.body
+  const { appId, fcmToken } = req.body
 
-  const result = await AuthCommonServices.handleLoginLogic(
-    { fcmToken: fcmToken, password: password },
+  const result = await AuthCommonServices.handleSocialLoginLogic(
+    { appId, fcmToken },
     user as IUser,
   )
-  const {status, message, accessToken, refreshToken, role} = result
+  const { status, message, accessToken, refreshToken, role } = result
 
   sendResponse<ILoginResponse>(res, {
     statusCode: status,
     success: true,
     message: message,
-    data: {accessToken, refreshToken, role},
+    data: { accessToken, refreshToken, role },
   })
 })
 
@@ -29,12 +29,12 @@ const googleAuthCallback = catchAsync(async (req: Request, res: Response) => {
   const result = await PassportAuthServices.handleGoogleLogin(
     req.user as IUser & { profile: any },
   )
-  const {status, message, accessToken, refreshToken, role} = result
+  const { status, message, accessToken, refreshToken, role } = result
   sendResponse(res, {
     statusCode: status,
     success: true,
     message: message,
-    data: {accessToken, refreshToken, role},
+    data: { accessToken, refreshToken, role },
   })
 })
 

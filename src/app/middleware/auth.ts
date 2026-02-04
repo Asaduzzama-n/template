@@ -51,6 +51,8 @@ const auth =
             }
             throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
           }
+        } else if (tokenWithBearer) {
+          throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid token format. Use Bearer token.')
         }
       } catch (error) {
         next(error)
@@ -102,6 +104,8 @@ export const tempAuth =
             }
             throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
           }
+        } else {
+          throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid token format. Use Bearer token.')
         }
       } catch (error) {
         next(error)

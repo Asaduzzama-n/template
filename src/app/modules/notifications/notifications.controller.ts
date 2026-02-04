@@ -3,9 +3,13 @@ import catchAsync from '../../../shared/catchAsync'
 import sendResponse from '../../../shared/sendResponse'
 import { StatusCodes } from 'http-status-codes'
 import { NotificationServices } from './notifications.service'
+import pick from '../../../shared/pick'
+import { paginationFields } from '../../../interfaces/pagination'
 
 const getMyNotifications = catchAsync(async (req: Request, res: Response) => {
-  const result = await NotificationServices.getNotifications(req.user!)
+  const paginationOptions = pick(req.query, paginationFields)
+  const result = await NotificationServices.getNotifications(req.user!, paginationOptions)
+
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
@@ -13,23 +17,26 @@ const getMyNotifications = catchAsync(async (req: Request, res: Response) => {
     data: result,
   })
 })
+
 const updateNotification = catchAsync(async (req: Request, res: Response) => {
-  const notificationId = req.params.id
-  const result = await NotificationServices.readNotification(notificationId)
+  const { id } = req.params
+  const result = await NotificationServices.readNotification(req.user!, id)
+
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Notifications updated successfully',
+    message: 'Notification marked as read',
     data: result,
   })
 })
 
 const updateAllNotifications = catchAsync(async (req: Request, res: Response) => {
   const result = await NotificationServices.readAllNotifications(req.user!)
+
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Notifications updated successfully',
+    message: 'All notifications marked as read',
     data: result,
   })
 })
@@ -39,3 +46,4 @@ export const NotificationController = {
   updateNotification,
   updateAllNotifications,
 }
+

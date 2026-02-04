@@ -32,12 +32,13 @@ const createUser = async (payload: IUser) => {
 
     const { otp, expiresIn, hashedOtp } = await generateOtp()
 
-    const authentication: Omit<IVerification, 'expiresAt' | 'requestCount'> = {
+    const authentication: Omit<IVerification, 'expiresAt'> = {
       identifier: payload.email,
       otpHash: hashedOtp,
       otpExpiresAt: expiresIn,
       latestRequest: new Date(),
-      attempts: 1,
+      attempts: 0,
+      requestCount: 1,
       type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION,
     }
 
@@ -53,7 +54,7 @@ const createUser = async (payload: IUser) => {
 
     emailHelper.sendEmail(createAccount)
 
-    return `${config.node_env === 'development' ? `${payload.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
+    return `${config.app.node_env === 'development' ? `${payload.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
   } catch (error: any) {
     await session.abortTransaction()
     if (error.code === 11000) {
@@ -95,7 +96,7 @@ const customLogin = async (payload: ILoginData): Promise<IAuthResponse> => {
     )
   }
 
-  return await AuthCommonServices.handleLoginLogic(payload, user)
+  return await AuthCommonServices.handleCustomLoginLogic(payload, user)
 }
 
 const adminLogin = async (payload: ILoginData): Promise<IAuthResponse> => {
@@ -198,12 +199,12 @@ const forgetPassword = async (email: string) => {
     const timeSinceLastRequest =
       (Date.now() - existingVerification.latestRequest.getTime()) / 1000
     const waitTime = Math.ceil(
-      Number(config.otp_request_cooldown_seconds) - timeSinceLastRequest,
+      Number(config.otp.request_cooldown_seconds) - timeSinceLastRequest,
     )
     if (existingVerification.latestRequest) {
       const secondsSinceLast =
         (Date.now() - existingVerification.latestRequest.getTime()) / 1000
-      if (secondsSinceLast < Number(config.otp_request_cooldown_seconds)) {
+      if (secondsSinceLast < Number(config.otp.request_cooldown_seconds)) {
         throw new ApiError(
           StatusCodes.TOO_MANY_REQUESTS,
           `Please wait ${waitTime} seconds before requesting a new OTP.`,
@@ -214,7 +215,7 @@ const forgetPassword = async (email: string) => {
     // Check Request Limit - NEW
     if (
       existingVerification.requestCount >=
-      Number(config.max_otp_request_allowed || 5)
+      Number(config.otp.max_request_allowed || 5)
     ) {
       throw new ApiError(
         StatusCodes.TOO_MANY_REQUESTS,
@@ -238,7 +239,7 @@ const forgetPassword = async (email: string) => {
         // We set the TTL index 'expiresAt' to 15 mins from NOW
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       },
-      $inc: { attempts: 0 }, // Reset attempts for a new OTP
+      $inc: { attempts: 0, requestCount: 1 }, // Reset attempts for a new OTP, increment request count
     },
     { upsert: true, new: true },
   )
@@ -254,7 +255,7 @@ const forgetPassword = async (email: string) => {
     console.error('Failed to send reset email:', err)
   })
 
-  return config.node_env === 'development'
+  return config.app.node_env === 'development'
     ? `An otp-${otp} is being sent to ${email}`
     : 'An OTP has been sent to your email. Please check your inbox.'
 }
@@ -372,7 +373,7 @@ const verifyAccount = async (
     }
 
     // 3. Brute Force Protection: Check Attempts
-    if (verification.attempts >= Number(config.max_otp_attempts)) {
+    if (verification.attempts >= Number(config.otp.max_attempts)) {
       // Optional: Logically you could also restrict the user account here
       throw new ApiError(
         StatusCodes.TOO_MANY_REQUESTS,
@@ -403,7 +404,12 @@ const verifyAccount = async (
     // A. ACCOUNT ACTIVATION
     if (verification.type === VERIFICATION_TYPE.ACCOUNT_ACTIVATION) {
       await User.findByIdAndUpdate(user._id, {
-        $set: { verified: true },
+        $set: {
+          verified: true,
+          'authentication.wrongLoginAttempts': 0,
+          'authentication.isRestricted': false,
+          'authentication.restrictionLeftAt': null,
+        },
       }).session(session)
 
       await Verification.deleteOne({
@@ -637,7 +643,7 @@ const deleteAccount = async (user: JwtPayload, password: string) => {
 
   if (!isPasswordMatched) {
     const attempts = wrongLoginAttempts + 1
-    const shouldLock = attempts >= Number(config.max_wrong_attempts)
+    const shouldLock = attempts >= Number(config.security.max_wrong_attempts)
 
     const updateQuery: any = {
       $inc: { 'authentication.wrongLoginAttempts': 1 },
@@ -646,7 +652,7 @@ const deleteAccount = async (user: JwtPayload, password: string) => {
 
     if (shouldLock) {
       const lockUntil = new Date(
-        Date.now() + Number(config.restriction_minutes) * 60 * 1000,
+        Date.now() + Number(config.security.restriction_minutes) * 60 * 1000,
       )
       updateQuery.$set['authentication.restrictionLeftAt'] = lockUntil
     }
@@ -717,7 +723,7 @@ const resendOtp = async (
       'No active session found. Please try the original action again.',
     )
   }
-  const OTP_RESEND_COOLDOWN = Number(config.otp_request_cooldown_seconds)
+  const OTP_RESEND_COOLDOWN = Number(config.otp.request_cooldown_seconds)
   // 3. Cooldown Logic (Time-based check)
   const secondsSinceLastRequest =
     (Date.now() - existingVerification.latestRequest.getTime()) / 1000
@@ -730,7 +736,7 @@ const resendOtp = async (
   }
 
   // 4. Hard Limit Logic (Request count check)
-  if (existingVerification.attempts >= Number(config.max_otp_attempts)) {
+  if (existingVerification.attempts >= Number(config.otp.max_attempts)) {
     throw new ApiError(
       StatusCodes.TOO_MANY_REQUESTS,
       'Maximum OTP resend limit reached. Please try again after 15 minutes.',
@@ -767,7 +773,7 @@ const resendOtp = async (
     console.error('Email Resend Failed:', err)
   })
 
-  const returnMessage = config.node_env === 'development' ? `Use this otp-${otp} to verify your account` : `A fresh OTP has been sent to your email.`
+  const returnMessage = config.app.node_env === 'development' ? `Use this otp-${otp} to verify your account` : `A fresh OTP has been sent to your email.`
   return returnMessage
 }
 
@@ -831,7 +837,7 @@ const changePassword = async (
   if (!isPasswordMatched) {
     // Increment wrongLoginAttempts to prevent brute-forcing this endpoint
     const attempts = wrongLoginAttempts + 1
-    const shouldLock = attempts >= Number(config.max_wrong_attempts)
+    const shouldLock = attempts >= Number(config.security.max_wrong_attempts)
 
     await User.findByIdAndUpdate(authId, {
       $inc: { 'authentication.wrongLoginAttempts': 1 },
@@ -839,7 +845,7 @@ const changePassword = async (
         'authentication.isRestricted': shouldLock,
         ...(shouldLock && {
           'authentication.restrictionLeftAt': new Date(
-            Date.now() + Number(config.restriction_minutes) * 60 * 1000,
+            Date.now() + Number(config.security.restriction_minutes) * 60 * 1000,
           ),
         }),
       },

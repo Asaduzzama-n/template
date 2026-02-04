@@ -40,14 +40,8 @@ const loginZodSchema = z.object({
   body: z
     .object({
       email: z.string().email({ message: 'Invalid email format.' }),
-      phone: z
-        .string()
-        .optional()
-        .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-          message: 'Invalid phone number format',
-        }),
-      fcmToken: z.string().min(1).optional(),
-      password: z.string().min(6, { message: "Password is required, and must be 6 character long." }),
+      password: z.string().min(1, { message: 'Password is required' }),
+      fcmToken: z.string().optional(),
     })
     .strict(),
 })

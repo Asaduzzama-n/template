@@ -1,7 +1,7 @@
 import { StatusCodes } from 'http-status-codes'
-import { ILoginData } from '../../../interfaces/auth'
+import { ILoginData, ISocialLoginData } from '../../../interfaces/auth'
 import ApiError from '../../../errors/ApiError'
-import { USER_STATUS } from '../../../enum/user'
+
 import { User } from '../user/user.model'
 import { AuthHelper } from './auth.helper'
 import { generateOtp } from '../../../utils/crypto'
@@ -13,7 +13,10 @@ import { Verification } from '../verification/verification.model'
 import { VERIFICATION_TYPE } from '../verification/verification.interface'
 import config from '../../../config'
 
-const handleLoginLogic = async (
+/**
+ * Handle Custom Login Logic (Email/Password)
+ */
+const handleCustomLoginLogic = async (
   payload: ILoginData,
   user: IUser,
 ): Promise<IAuthResponse> => {
@@ -49,7 +52,7 @@ const handleLoginLogic = async (
 
   if (!isMatch) {
     const attempts = wrongLoginAttempts + 1
-    const shouldLock = attempts >= Number(config.max_wrong_attempts)
+    const shouldLock = attempts >= Number(config.security.max_wrong_attempts)
 
     const updateQuery: any = {
       $inc: { 'authentication.wrongLoginAttempts': 1 },
@@ -58,11 +61,10 @@ const handleLoginLogic = async (
 
     if (shouldLock) {
       const lockUntil = new Date(
-        Date.now() + Number(config.restriction_minutes) * 60 * 1000,
+        Date.now() + Number(config.security.restriction_minutes) * 60 * 1000,
       )
 
-      // Strategy Toggle: STRICT_EARLIEST (min) vs EXTEND (set)
-      if (config.lock_out_strategy === 'EXTEND') {
+      if (config.security.lock_out_strategy === 'EXTEND') {
         updateQuery.$min = { 'authentication.restrictionLeftAt': lockUntil }
       } else {
         updateQuery.$set['authentication.restrictionLeftAt'] = lockUntil
@@ -77,35 +79,32 @@ const handleLoginLogic = async (
     )
   }
 
-  // 3. Verification Check (Using UPSERT for Verification model)
+  // 3. Verification Check
   if (!verified) {
     const existingOTP = await Verification.findOne({
       identifier: email,
       type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION,
     })
 
-   if (existingOTP) {
-    // A. Check Cooldown (Time-based)
-    if (existingOTP.latestRequest) {
-      const secondsSinceLast = (Date.now() - existingOTP.latestRequest.getTime()) / 1000;
-      if (secondsSinceLast < Number(config.otp_request_cooldown_seconds)) {
-        const waitTime = Math.ceil(Number(config.otp_request_cooldown_seconds) - secondsSinceLast);
-        throw new ApiError(StatusCodes.TOO_MANY_REQUESTS, `Please wait ${waitTime} seconds.`);
+    if (existingOTP) {
+      if (existingOTP.latestRequest) {
+        const secondsSinceLast = (Date.now() - existingOTP.latestRequest.getTime()) / 1000
+        if (secondsSinceLast < Number(config.otp.request_cooldown_seconds)) {
+          const waitTime = Math.ceil(Number(config.otp.request_cooldown_seconds) - secondsSinceLast)
+          throw new ApiError(StatusCodes.TOO_MANY_REQUESTS, `Please wait ${waitTime} seconds.`)
+        }
+      }
+
+      if (existingOTP.requestCount >= Number(config.otp.max_request_allowed || 5)) {
+        throw new ApiError(
+          StatusCodes.TOO_MANY_REQUESTS,
+          'Maximum OTP limit reached. Please try again in 15 minutes.',
+        )
       }
     }
 
-    // B. Check Request Limit (Volume-based) - NEW
-    if (existingOTP.requestCount >= Number(config.max_otp_request_allowed || 5)) {
-      throw new ApiError(
-        StatusCodes.TOO_MANY_REQUESTS,
-        'Maximum OTP limit reached. Please try again in 15 minutes.',
-      );
-    }
-  }
-
     const { otp, expiresIn, hashedOtp } = await generateOtp()
 
-    // Upsert ensures we don't crash on duplicate identity keys
     await Verification.findOneAndUpdate(
       { identifier: email, type: VERIFICATION_TYPE.ACCOUNT_ACTIVATION },
       {
@@ -113,15 +112,14 @@ const handleLoginLogic = async (
           otpHash: hashedOtp,
           otpExpiresAt: expiresIn,
           latestRequest: new Date(),
-          attempts: 0, // IMPORTANT: Reset failed OTP attempts when a new one is sent
-          // Reset the TTL timer to 15 mins from NOW
+          attempts: 0,
           expiresAt: new Date(Date.now() + 15 * 60 * 1000),
         },
+        $inc: { requestCount: 1 },
       },
       { upsert: true, new: true },
     )
 
-    // Offload to helper (consider using a queue here for true production scale)
     emailHelper.sendEmail(emailTemplate.createAccount({ email, otp, name }))
 
     return authResponse(StatusCodes.FORBIDDEN, 'Account unverified. OTP sent.')
@@ -139,7 +137,6 @@ const handleLoginLogic = async (
 
   const tokens = AuthHelper.createToken(_id, role, name, email)
 
-  // Best Practice: Return options as an object to keep code readable
   return authResponse(StatusCodes.OK, `Welcome back ${name}`, {
     role,
     accessToken: tokens.accessToken,
@@ -147,8 +144,40 @@ const handleLoginLogic = async (
   })
 }
 
+/**
+ * Handle Social Login Logic (appId based)
+ */
+const handleSocialLoginLogic = async (
+  payload: ISocialLoginData,
+  user: IUser,
+): Promise<IAuthResponse> => {
+  const { _id, name, role, email } = user
+
+  // Social login skips password checks and verification checks as we assume the provider verified them
+  // We simply update the status if needed and return tokens
+
+  await User.findByIdAndUpdate(_id, {
+    $set: {
+      verified: true, // Social accounts are trusted
+      'authentication.wrongLoginAttempts': 0,
+      'authentication.isRestricted': false,
+      'authentication.restrictionLeftAt': null,
+      ...(payload.fcmToken && { fcmToken: payload.fcmToken }),
+    },
+  })
+
+  const tokens = AuthHelper.createToken(_id, role, name, email)
+
+  return authResponse(StatusCodes.OK, `Welcome ${name}`, {
+    role,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  })
+}
+
 export const AuthCommonServices = {
-  handleLoginLogic,
+  handleCustomLoginLogic,
+  handleSocialLoginLogic,
 }
 
 export const authResponse = (
@@ -168,8 +197,6 @@ export const authResponse = (
   }
 }
 
-
-
-export const getSanitizeEmail = (email:string):string =>{
+export const getSanitizeEmail = (email: string): string => {
   return email.toLowerCase().trim()
 }

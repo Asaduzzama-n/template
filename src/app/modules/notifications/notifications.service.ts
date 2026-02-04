@@ -1,57 +1,68 @@
 import { StatusCodes } from 'http-status-codes'
 import ApiError from '../../../errors/ApiError'
 import { JwtPayload } from 'jsonwebtoken'
-import { Types } from 'mongoose'
 import { Notification } from './notifications.model'
 import { IPaginationOptions } from '../../../interfaces/pagination'
 import { paginationHelper } from '../../../helpers/paginationHelper'
-
-
+import { logger } from '../../../shared/logger'
 
 const getNotifications = async (user: JwtPayload, paginationOptions: IPaginationOptions) => {
   const { page, limit, skip, sortBy, sortOrder } = paginationHelper.calculatePagination(paginationOptions)
+
   const [result, total] = await Promise.all([
     Notification.find({ to: user.authId })
-      .populate('to')
-      .populate('from')
+      .populate('from', 'name profile')
       .skip(skip)
       .limit(limit)
       .sort({ [sortBy]: sortOrder })
       .lean(),
     Notification.countDocuments({ to: user.authId }),
   ])
-  
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      data: result,
-    }
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+    data: result,
+  }
 }
 
-const readNotification = async (id: string) => {
- try {
+const readNotification = async (user: JwtPayload, id: string) => {
+  try {
+    const notification = await Notification.findById(id)
+    if (!notification) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Notification not found')
+    }
+
+    // Security: Only the recipient can mark a notification as read
+    if (notification.to.toString() !== user.authId) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'You are not authorized to read this notification')
+    }
+
     await Notification.findByIdAndUpdate(
-      new Types.ObjectId(id),
+      id,
       { isRead: true },
       { new: true },
     )
     return 'Notification read successfully'
- } catch (error) {
+  } catch (error) {
+    logger.error('readNotification error:', error)
+    if (error instanceof ApiError) throw error
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to mark notification as read')
- }
+  }
 }
 
 const readAllNotifications = async (user: JwtPayload) => {
- try {
+  try {
     await Notification.updateMany({ to: user.authId }, { isRead: true })
     return 'All notifications read successfully'
- } catch (error) {
+  } catch (error) {
+    logger.error('readAllNotifications error:', error)
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to mark all notifications as read')
- }
+  }
 }
 
 export const NotificationServices = {

@@ -1,20 +1,10 @@
 import colors from 'colors'
-import { Server, Socket } from 'socket.io'
+import { Server } from 'socket.io'
 import { logger } from '../shared/logger'
 import { onlineUsers } from '../server'
-import { Notification } from '../app/modules/notifications/notifications.model'
 import { USER_ROLES } from '../enum/user'
-import { JwtPayload } from 'jsonwebtoken'
 import { socketMiddleware } from '../app/middleware/socketAuth'
-
-
-// Define interface for socket with user data
-export interface SocketWithUser extends Socket {
-  user?: JwtPayload & {
-    authId: string
-    role: string
-  }
-}
+import { SocketWithUser } from '../interfaces/socket'
 
 const socket = (io: Server) => {
   // Apply authentication middleware to all connections
@@ -75,5 +65,5 @@ const registerEventHandlers = (socket: SocketWithUser) => {
 
 export const socketHelper = {
   socket,
-  // sendNotificationsToAllConnectedUsers,`
+  // sendNotificationsToAllConnectedUsers,
 }

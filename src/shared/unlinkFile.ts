@@ -1,10 +1,12 @@
-import fs from 'fs'
+import fs from 'fs/promises'
 import path from 'path'
 
-const unlinkFile = (file: string) => {
+const unlinkFile = async (file: string): Promise<void> => {
   const filePath = path.join('uploads', file)
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath)
+  try {
+    await fs.unlink(filePath)
+  } catch {
+    // File doesn't exist - ignore
   }
 }
 

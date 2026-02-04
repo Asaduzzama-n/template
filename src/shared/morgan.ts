@@ -9,7 +9,7 @@ morgan.token(
 )
 
 const getIpFormat = () =>
-  config.node_env === 'development' ? ':remote-addr - ' : ''
+  config.app.node_env === 'development' ? ':remote-addr - ' : ''
 const successResponseFormat = `${getIpFormat()}:method :url :status - :response-time ms`
 const errorResponseFormat = `${getIpFormat()}:method :url :status - :response-time ms`
 

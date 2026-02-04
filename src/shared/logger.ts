@@ -1,75 +1,93 @@
 import path from 'path'
+import fs from 'fs'
 import { createLogger, format, transports } from 'winston'
 import DailyRotateFile from 'winston-daily-rotate-file'
-import fs from 'fs'
-import { TransformableInfo } from 'logform'
+import config from '../config'
 
-// Function to create the necessary directories if they don't exist
-const createLogDirs = () => {
-  const dirs = ['logs/winston/successes', 'logs/winston/errors']
-  dirs.forEach(dir => {
-    if (!fs.existsSync(path.join(process.cwd(), dir))) {
-      fs.mkdirSync(path.join(process.cwd(), dir), { recursive: true })
-    }
-  })
-}
+const { combine, timestamp, label, printf, colorize, errors, json } = format
 
-// Custom log format
-const { combine, timestamp, label, printf } = format
+// Ensure log directories exist
+const logDir = path.join(process.cwd(), 'logs/winston')
+const successDir = path.join(logDir, 'successes')
+const errorDir = path.join(logDir, 'errors')
 
-const myFormat = printf((info: TransformableInfo) => {
-  const { level, message, label, timestamp } = info
-  const date = new Date(timestamp as string)
-  const hour = date.getHours().toString().padStart(2, '0')
-  const minutes = date.getMinutes().toString().padStart(2, '0')
-  const seconds = date.getSeconds().toString().padStart(2, '0')
-  return `{${date.toDateString()} ${hour}:${minutes}:${seconds}} [${label}] ${level}: ${message}`
+if (!fs.existsSync(successDir)) fs.mkdirSync(successDir, { recursive: true })
+if (!fs.existsSync(errorDir)) fs.mkdirSync(errorDir, { recursive: true })
+
+// Custom console format for development
+const devFormat = printf(({ level, message, label, timestamp, stack }) => {
+  return `${timestamp} [${label}] ${level}: ${stack || message}`
 })
 
-createLogDirs() // Ensure directories exist
+// Base configuration
+const baseLabel = config.app.platform_name || 'API-SERVICE'
+const isProduction = config.app.node_env === 'production'
 
-// Success logger
+/**
+ * Production-ready Logger
+ * Supports:
+ * - JSON logging in production for ELK/CloudWatch
+ * - Colorized logging in development
+ * - Automatic stack trace capture for Error objects
+ * - Separate log rotation for info and error levels
+ */
 const logger = createLogger({
-  level: 'info',
-  format: combine(label({ label: 'EXPRESS-CRAFT 🚀' }), timestamp(), myFormat),
+  level: isProduction ? 'info' : 'debug',
+  format: combine(
+    label({ label: baseLabel }),
+    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    errors({ stack: true }),
+    isProduction ? json() : combine(colorize(), devFormat),
+  ),
   transports: [
+    // Console transport
     new transports.Console(),
+
+    // Success log rotation
     new DailyRotateFile({
-      filename: path.join(
-        process.cwd(),
-        'logs',
-        'winston',
-        'successes',
-        'sg-%DATE%-success.log',
-      ),
-      datePattern: 'YYYY-MM-DD-HH',
+      level: 'info',
+      filename: path.join(successDir, 'success-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
       zippedArchive: true,
       maxSize: '20m',
-      maxFiles: '14d',
+      maxFiles: '30d',
+    }),
+
+    // Error log rotation
+    new DailyRotateFile({
+      level: 'error',
+      filename: path.join(errorDir, 'error-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '30d',
+    }),
+  ],
+  // Handle uncaught exceptions and unhandled rejections
+  exceptionHandlers: [
+    new transports.Console(),
+    new DailyRotateFile({
+      filename: path.join(errorDir, 'exceptions-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '30d',
+    }),
+  ],
+  rejectionHandlers: [
+    new transports.Console(),
+    new DailyRotateFile({
+      filename: path.join(errorDir, 'rejections-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '30d',
     }),
   ],
 })
 
-// Error logger
-const errorLogger = createLogger({
-  level: 'error', // This ensures that only error-level messages are logged
-  format: combine(label({ label: 'EXPRESS-CRAFT 🐞' }), timestamp(), myFormat),
-  transports: [
-    new transports.Console(),
-    new DailyRotateFile({
-      filename: path.join(
-        process.cwd(),
-        'logs',
-        'winston',
-        'errors',
-        'sg-%DATE%-error.log',
-      ),
-      datePattern: 'YYYY-MM-DD-HH',
-      zippedArchive: true,
-      maxSize: '20m',
-      maxFiles: '14d',
-    }),
-  ],
-})
+// Maintain backward compatibility with existing exports
+const errorLogger = logger
 
 export { logger, errorLogger }
+

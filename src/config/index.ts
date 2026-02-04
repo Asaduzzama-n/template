@@ -4,28 +4,36 @@ import path from 'path'
 dotenv.config({ path: path.join(process.cwd(), '.env') })
 
 export default {
-  ip_address: process.env.IP_ADDRESS,
-  database_url: process.env.DATABASE_URL,
-  node_env: process.env.NODE_ENV,
-  port: process.env.PORT,
-  bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
-  firebase_service_account_base64: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
-  platform_name: process.env.PLATFORM_NAME,
-  admin: {
-    email: process.env.ADMIN_EMAIL,
-    password: process.env.ADMIN_PASSWORD
+  // ============================================
+  // App Configuration
+  // ============================================
+  app: {
+    node_env: process.env.NODE_ENV,
+    port: process.env.PORT,
+    ip_address: process.env.IP_ADDRESS,
+    platform_name: process.env.PLATFORM_NAME,
   },
-  google: {
-    client_id: process.env.GOOGLE_CLIENT_ID,
-    client_secret: process.env.GOOGLE_CLIENT_SECRET,
-    callback_url: process.env.GOOGLE_CALLBACK_URL,
+
+  // ============================================
+  // Database Configuration
+  // ============================================
+  database: {
+    url: process.env.DATABASE_URL,
   },
-  aws: {
-    access_key_id: process.env.AWS_ACCESS_KEY_ID,
-    secret_access_key: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION,
-    bucket_name: process.env.AWS_BUCKET_NAME,
+
+  // ============================================
+  // Security Configuration
+  // ============================================
+  security: {
+    bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
+    lock_out_strategy: process.env.LOCKOUT_STRATEGY,
+    max_wrong_attempts: process.env.MAX_WRONG_ATTEMPTS,
+    restriction_minutes: process.env.RESTRICTION_MINUTES,
   },
+
+  // ============================================
+  // JWT Configuration
+  // ============================================
   jwt: {
     jwt_secret: process.env.JWT_SECRET,
     jwt_expire_in: process.env.JWT_EXPIRE_IN,
@@ -34,12 +42,27 @@ export default {
     temp_jwt_secret: process.env.TEMP_JWT_SECRET,
     temp_jwt_expire_in: process.env.TEMP_JWT_EXPIRE_IN,
   },
-  application_fee: process.env.APPLICATION_FEE,
-  instant_transfer_fee: process.env.INSTANT_TRANSFER_FEE,
-  openAi_api_key: process.env.OPENAI_API_KEY,
-  stripe_secret: process.env.STRIPE_SECRET_KEY,
-  stripe_account_id: process.env.STRIPE_ACCOUNT_ID,
-  webhook_secret: process.env.WEBHOOK_SECRET,
+
+  // ============================================
+  // OTP Configuration
+  // ============================================
+  otp: {
+    request_cooldown_seconds: process.env.OTP_REQUEST_COOLDOWN_SECONDS,
+    max_attempts: process.env.MAX_OTP_ATTEMPTS,
+    max_request_allowed: process.env.MAX_OTP_REQUEST_ALLOWED,
+  },
+
+  // ============================================
+  // Admin Configuration
+  // ============================================
+  admin: {
+    email: process.env.ADMIN_EMAIL,
+    password: process.env.ADMIN_PASSWORD,
+  },
+
+  // ============================================
+  // Email Configuration
+  // ============================================
   email: {
     from: process.env.EMAIL_FROM,
     user: process.env.EMAIL_USER,
@@ -47,20 +70,66 @@ export default {
     host: process.env.EMAIL_HOST,
     pass: process.env.EMAIL_PASS,
   },
+
+  // ============================================
+  // AWS Configuration
+  // ============================================
+  aws: {
+    access_key_id: process.env.AWS_ACCESS_KEY_ID,
+    secret_access_key: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION,
+    bucket_name: process.env.AWS_BUCKET_NAME,
+  },
+
+  // ============================================
+  // Google OAuth Configuration
+  // ============================================
+  google: {
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_secret: process.env.GOOGLE_CLIENT_SECRET,
+    callback_url: process.env.GOOGLE_CALLBACK_URL,
+  },
+
+  // ============================================
+  // Firebase Configuration
+  // ============================================
+  firebase: {
+    service_account_base64: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
+  },
+
+  // ============================================
+  // Stripe Configuration
+  // ============================================
+  stripe: {
+    secret_key: process.env.STRIPE_SECRET_KEY,
+    account_id: process.env.STRIPE_ACCOUNT_ID,
+    webhook_secret: process.env.WEBHOOK_SECRET,
+    application_fee: process.env.APPLICATION_FEE,
+    instant_transfer_fee: process.env.INSTANT_TRANSFER_FEE,
+  },
+
+  // ============================================
+  // Twilio Configuration
+  // ============================================
   twilio: {
     account_sid: process.env.TWILIO_ACCOUNT_SID,
     auth_token: process.env.TWILIO_AUTH_TOKEN,
     phone_number: process.env.TWILIO_PHONE_NUMBER,
   },
+
+  // ============================================
+  // Cloudinary Configuration
+  // ============================================
   cloudinary: {
-    cloudinary_name: process.env.CLOUDINARY_NAME,
-    cloudinary_api_key: process.env.CLOUDINARY_API_KEY,
-    cloudinary_secret: process.env.CLOUDINARY_SECRET,
+    name: process.env.CLOUDINARY_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    secret: process.env.CLOUDINARY_SECRET,
   },
-  lock_out_strategy: process.env.LOCKOUT_STRATEGY,
-  max_wrong_attempts: process.env.MAX_WRONG_ATTEMPTS,
-  restriction_minutes: process.env.RESTRICTION_MINUTES,
-  otp_request_cooldown_seconds: process.env.OTP_REQUEST_COOLDOWN_SECONDS,
-  max_otp_attempts: process.env.MAX_OTP_ATTEMPTS,
-  max_otp_request_allowed: process.env.MAX_OTP_REQUEST_ALLOWED
+
+  // ============================================
+  // OpenAI Configuration
+  // ============================================
+  openai: {
+    api_key: process.env.OPENAI_API_KEY,
+  },
 }

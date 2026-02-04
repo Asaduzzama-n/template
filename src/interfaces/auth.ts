@@ -4,8 +4,13 @@ export type IVerifyEmail = {
 }
 
 export type ILoginData = {
-  password: string
   email: string
+  password: string
+  fcmToken?: string
+}
+
+export type ISocialLoginData = {
+  appId: string
   fcmToken?: string
 }
 

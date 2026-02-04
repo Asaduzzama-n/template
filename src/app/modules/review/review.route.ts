@@ -7,9 +7,37 @@ import { ReviewValidations } from './review.validation';
 
 const router = express.Router();
 
-router.post('/',auth(USER_ROLES.DRIVER,USER_ROLES.COMPANY,USER_ROLES.ADMIN, USER_ROLES.MECHANIC, USER_ROLES.COOK, USER_ROLES.FUEL_PROVIDER),validateRequest(ReviewValidations.create), ReviewController.createReview);
-router.get('/:type',auth(USER_ROLES.DRIVER,USER_ROLES.COMPANY,USER_ROLES.ADMIN, USER_ROLES.MECHANIC, USER_ROLES.COOK, USER_ROLES.FUEL_PROVIDER), ReviewController.getAllReviews);
-router.patch('/:id',auth(USER_ROLES.DRIVER,USER_ROLES.COMPANY,USER_ROLES.ADMIN, USER_ROLES.MECHANIC, USER_ROLES.COOK, USER_ROLES.FUEL_PROVIDER),validateRequest(ReviewValidations.update), ReviewController.updateReview);
-router.delete('/:id',auth(USER_ROLES.DRIVER,USER_ROLES.COMPANY,USER_ROLES.ADMIN, USER_ROLES.MECHANIC, USER_ROLES.COOK, USER_ROLES.FUEL_PROVIDER), ReviewController.deleteReview);
+// Users can create reviews, admins can also create
+router.post(
+    '/',
+    auth(USER_ROLES.USER, USER_ROLES.ADMIN),
+    validateRequest(ReviewValidations.create),
+    ReviewController.createReview
+);
+
+// Get reviews with type validation
+router.get(
+    '/:type',
+    auth(USER_ROLES.USER, USER_ROLES.ADMIN),
+    validateRequest(ReviewValidations.getByType),
+    ReviewController.getAllReviews
+);
+
+// Update with id validation
+router.patch(
+    '/:id',
+    auth(USER_ROLES.USER, USER_ROLES.ADMIN),
+    validateRequest(ReviewValidations.idParam),
+    validateRequest(ReviewValidations.update),
+    ReviewController.updateReview
+);
+
+// Delete with id validation
+router.delete(
+    '/:id',
+    auth(USER_ROLES.USER, USER_ROLES.ADMIN),
+    validateRequest(ReviewValidations.idParam),
+    ReviewController.deleteReview
+);
 
 export const ReviewRoutes = router;

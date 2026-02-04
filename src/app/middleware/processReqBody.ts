@@ -93,7 +93,7 @@ export const fileAndBodyProcessor = () => {
               const filePath = `/${fieldName}/${filename}`
 
               // Apply Sharp optimization for images
-              if (fieldName === 'image' && file.mimetype.startsWith('image/')) {
+              if (fieldName === 'images' && file.mimetype.startsWith('image/')) {
                 try {
                   // Create Sharp instance
                   let sharpInstance = sharp(file.buffer).resize(800)
@@ -132,12 +132,6 @@ export const fileAndBodyProcessor = () => {
   }
 }
 
-// Utility function to generate random string
-function generateRandomString(length: number = 9): string {
-  return Math.random()
-    .toString(36)
-    .slice(2, 2 + length)
-}
 
 export const fileAndBodyProcessorUsingDiskStorage = () => {
   // Create uploads directory if it doesn't exist
@@ -233,7 +227,7 @@ export const fileAndBodyProcessorUsingDiskStorage = () => {
               const filePath = `/${fieldName}/${file.filename}`
 
               // Apply Sharp optimization for images
-              if (fieldName === 'image' && file.mimetype.startsWith('image/')) {
+              if (fieldName === 'images' && file.mimetype.startsWith('image/')) {
                 try {
                   const fullPath = path.join(
                     uploadsDir,

@@ -5,26 +5,24 @@ import sendResponse from '../../../shared/sendResponse'
 import { StatusCodes } from 'http-status-codes'
 
 const createPublic = catchAsync(async (req: Request, res: Response) => {
-  const publicData = req.body
-  const result = await PublicServices.createPublic(publicData)
+  const result = await PublicServices.createPublic(req.body)
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: `${publicData?.type} updated successfully`,
-    data: result,
+    message: result,
+    data: null,
   })
 })
 
 const getAllPublics = catchAsync(async (req: Request, res: Response) => {
-  const result = await PublicServices.getAllPublics(
-    req.params.type as 'privacy-policy' | 'terms-and-condition',
-  )
+  const { type } = req.params
+  const result = await PublicServices.getAllPublics(type)
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: `${req.params.type} retrieved successfully`,
+    message: 'Public content retrieved successfully',
     data: result,
   })
 })
@@ -36,7 +34,7 @@ const deletePublic = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: `${result?.type} deleted successfully`,
+    message: 'Public content deleted successfully',
     data: result,
   })
 })
@@ -53,26 +51,24 @@ const createContact = catchAsync(async (req: Request, res: Response) => {
 })
 
 const createFaq = catchAsync(async (req: Request, res: Response) => {
-  const faqData = req.body
-  const result = await PublicServices.createFaq(faqData)
+  const result = await PublicServices.createFaq(req.body)
 
   sendResponse(res, {
     statusCode: StatusCodes.CREATED,
     success: true,
-    message: 'Faq created successfully',
+    message: 'FAQ created successfully',
     data: result,
   })
 })
 
 const updateFaq = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params
-  const faqData = req.body
-  const result = await PublicServices.updateFaq(id, faqData)
+  const result = await PublicServices.updateFaq(id, req.body)
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Faq updated successfully',
+    message: 'FAQ updated successfully',
     data: result,
   })
 })
@@ -84,7 +80,7 @@ const getSingleFaq = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Faq retrieved successfully',
+    message: 'FAQ retrieved successfully',
     data: result,
   })
 })
@@ -95,7 +91,7 @@ const getAllFaqs = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Faqs retrieved successfully',
+    message: 'FAQs retrieved successfully',
     data: result,
   })
 })
@@ -107,7 +103,7 @@ const deleteFaq = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Faq deleted successfully',
+    message: 'FAQ deleted successfully',
     data: result,
   })
 })
@@ -123,3 +119,4 @@ export const PublicController = {
   getAllFaqs,
   deleteFaq,
 }
+
