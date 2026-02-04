@@ -42,25 +42,27 @@ passport.use(
   ),
 )
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: config.google.client_id!,
-      clientSecret: config.google.client_secret!,
-      callbackURL: config.google.callback_url,
-      passReqToCallback: true,
-    },
-    async (req, accessToken, refreshToken, profile, done) => {
-      req.body.profile = profile
-      req.body.role = USER_ROLES.CUSTOMER
+if (config.google.client_id && config.google.client_secret) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: config.google.client_id,
+        clientSecret: config.google.client_secret,
+        callbackURL: config.google.callback_url,
+        passReqToCallback: true,
+      },
+      async (req, accessToken, refreshToken, profile, done) => {
+        req.body.profile = profile
+        req.body.role = USER_ROLES.CUSTOMER
 
-      try {
-        return done(null, req.body)
-      } catch (err) {
-        return done(err)
-      }
-    },
-  ),
-)
+        try {
+          return done(null, req.body)
+        } catch (err) {
+          return done(err)
+        }
+      },
+    ),
+  )
+}
 
 export default passport

@@ -6,6 +6,8 @@ import { User } from '../user/user.model'
 import { emailHelper } from '../../../helpers/emailHelper'
 import { logger } from '../../../shared/logger'
 import * as entities from 'entities'
+import { redisHelper } from '../../../helpers/redisHelper'
+import { RedisKeys } from '../../../enum/redis.keys'
 
 const createPublic = async (payload: IPublic) => {
   const result = await Public.findOneAndUpdate(
@@ -18,13 +20,35 @@ const createPublic = async (payload: IPublic) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to save public content')
   }
 
+  // Update Cache
+  const cacheKey =
+    payload.type === 'terms-and-condition'
+      ? RedisKeys.TERMS_AND_CONDITION
+      : RedisKeys.PRIVACY_POLICY
+  await redisHelper.set(cacheKey, JSON.stringify(result))
+
   return `${payload.type} saved successfully`
 }
 
-const getAllPublics = async (
-  type: string,
-) => {
+const getAllPublics = async (type: string) => {
+  const cacheKey =
+    type === 'terms-and-condition'
+      ? RedisKeys.TERMS_AND_CONDITION
+      : RedisKeys.PRIVACY_POLICY
+
+  // Try Cache
+  const cachedData = await redisHelper.get(cacheKey)
+  if (cachedData) {
+    return JSON.parse(cachedData)
+  }
+
+  // Fallback to DB
   const result = await Public.findOne({ type }).lean()
+
+  if (result) {
+    await redisHelper.set(cacheKey, JSON.stringify(result))
+  }
+
   return result || null
 }
 
@@ -108,11 +132,27 @@ const createFaq = async (payload: IFaq) => {
   const result = await Faq.create(payload)
   if (!result)
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Failed to create Faq')
+
+  // Invalidate FAQ cache
+  await redisHelper.del(RedisKeys.FAQ)
+
   return result
 }
 
 const getAllFaqs = async () => {
+  // Try Cache
+  const cachedData = await redisHelper.get(RedisKeys.FAQ)
+  if (cachedData) {
+    return JSON.parse(cachedData)
+  }
+
+  // Fallback to DB
   const result = await Faq.find({}).lean()
+
+  if (result && result.length > 0) {
+    await redisHelper.set(RedisKeys.FAQ, JSON.stringify(result))
+  }
+
   return result || []
 }
 
@@ -135,6 +175,9 @@ const updateFaq = async (id: string, payload: Partial<IFaq>) => {
     throw new ApiError(StatusCodes.NOT_FOUND, 'FAQ not found')
   }
 
+  // Invalidate FAQ cache
+  await redisHelper.del(RedisKeys.FAQ)
+
   return result
 }
 
@@ -143,6 +186,10 @@ const deleteFaq = async (id: string) => {
   if (!result) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'FAQ not found')
   }
+
+  // Invalidate FAQ cache
+  await redisHelper.del(RedisKeys.FAQ)
+
   return result
 }
 

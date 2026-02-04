@@ -132,4 +132,13 @@ export default {
   openai: {
     api_key: process.env.OPENAI_API_KEY,
   },
+
+  // ============================================
+  // Redis Configuration
+  // ============================================
+  redis: {
+    url: process.env.REDIS_URL || '127.0.0.1',
+    port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD || '',
+  },
 }

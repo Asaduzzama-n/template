@@ -10,6 +10,7 @@ import { UserServices } from './app/modules/user/user.service'
 
 
 import { setSocketIO } from './helpers/socketInstances'
+import { redisHelper } from './helpers/redisHelper'
 //uncaught exception
 process.on('uncaughtException', error => {
   errorLogger.error('UnhandledException Detected', error)
@@ -39,10 +40,6 @@ async function main() {
         origin: '*',
       },
     })
-
-    //create admin user
-    await UserServices.createAdmin()
-
 
     socketHelper.socket(io)
     setSocketIO(io)
