@@ -7,6 +7,7 @@ import { ZodError } from 'zod'
 import handleZodError from '../../errors/handleZodError'
 import handleCastError from '../../errors/handleCastError'
 import ApiError from '../../errors/ApiError'
+import { errorLogger } from '../../shared/logger'
 
 const globalErrorHandler: ErrorRequestHandler = (
   error,
@@ -14,9 +15,7 @@ const globalErrorHandler: ErrorRequestHandler = (
   res: Response,
   next: NextFunction,
 ) => {
-  // config.app.node_env === 'development'
-  //   ? console.log('Inside Global Error Handler🪐', error)
-  //   : console.log('Inside Global Error Handler🪐', error)
+  errorLogger.error(error)
 
   let statusCode = 500
   let message = 'Something went wrong!'

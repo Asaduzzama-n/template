@@ -12,6 +12,7 @@ import { emailHelper } from '../../../helpers/emailHelper'
 import { Verification } from '../verification/verification.model'
 import { VERIFICATION_TYPE } from '../verification/verification.interface'
 import config from '../../../config'
+import { logger } from '../../../shared/logger'
 
 /**
  * Handle Custom Login Logic (Email/Password)
@@ -41,6 +42,7 @@ const handleCustomLoginLogic = async (
     const remaining = Math.ceil(
       (restrictionLeftAt.getTime() - Date.now()) / 60000,
     )
+    logger.warn(`Locked account login attempt: ${email} (${remaining} mins left)`)
     throw new ApiError(
       StatusCodes.TOO_MANY_REQUESTS,
       `Account temporarily locked. Try again in ${remaining} minutes.`,
@@ -64,11 +66,15 @@ const handleCustomLoginLogic = async (
         Date.now() + Number(config.security.restriction_minutes) * 60 * 1000,
       )
 
+      logger.warn(`Brute force detection: Locking account ${email} for ${config.security.restriction_minutes} minutes after ${attempts} attempts.`)
+
       if (config.security.lock_out_strategy === 'EXTEND') {
         updateQuery.$min = { 'authentication.restrictionLeftAt': lockUntil }
       } else {
         updateQuery.$set['authentication.restrictionLeftAt'] = lockUntil
       }
+    } else {
+      logger.info(`Failed login attempt: ${email} (Attempts: ${attempts})`)
     }
 
     await User.findByIdAndUpdate(_id, updateQuery)
@@ -122,6 +128,7 @@ const handleCustomLoginLogic = async (
 
     emailHelper.sendEmail(emailTemplate.createAccount({ email, otp, name }))
 
+    logger.info(`Unverified login attempt: ${email}. Resending OTP.`)
     return authResponse(StatusCodes.FORBIDDEN, 'Account unverified. OTP sent.')
   }
 
@@ -136,6 +143,8 @@ const handleCustomLoginLogic = async (
   })
 
   const tokens = AuthHelper.createToken(_id, role, name, email)
+
+  logger.info(`User logged in successfully: ${email} (Role: ${role})`)
 
   return authResponse(StatusCodes.OK, `Welcome back ${name}`, {
     role,

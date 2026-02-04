@@ -8,6 +8,7 @@ import { IUser } from '../../user/user.interface'
 import { AuthHelper } from '../auth.helper'
 import { IAuthResponse } from '../auth.interface'
 import { authResponse } from '../common'
+import { logger } from '../../../../shared/logger'
 
 const handleGoogleLogin = async (
   payload: IUser & { profile: any },
@@ -21,6 +22,9 @@ const handleGoogleLogin = async (
   if (isUserExist) {
     //return only the token
     const tokens = AuthHelper.createToken(isUserExist._id, isUserExist.role)
+
+    logger.info(`Google login (EXISTING USER): ${email}`)
+
     return authResponse(
       StatusCodes.OK,
       `Welcome ${isUserExist.name} to our platform.`,
@@ -57,6 +61,8 @@ const handleGoogleLogin = async (
 
     await session.commitTransaction()
     await session.endSession()
+
+    logger.info(`Google login (NEW USER): ${email}`)
 
     return authResponse(
       StatusCodes.OK,

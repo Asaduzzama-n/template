@@ -8,6 +8,7 @@ import { Token } from '../../token/token.model'
 import { IAuthResponse, IResetPassword } from '../auth.interface'
 import { emailTemplate } from '../../../../shared/emailTemplate'
 import cryptoToken, { compareOtp, generateOtp } from '../../../../utils/crypto'
+import { logger, errorLogger } from '../../../../shared/logger'
 import { IChangePassword, ILoginData } from '../../../../interfaces/auth'
 import { AuthCommonServices, authResponse, getSanitizeEmail } from '../common'
 import { jwtHelper } from '../../../../helpers/jwtHelper'
@@ -53,6 +54,8 @@ const createUser = async (payload: IUser) => {
       await session.commitTransaction()
 
     emailHelper.sendEmail(createAccount)
+
+    logger.info(`New user registered: ${payload.email}`)
 
     return `${config.app.node_env === 'development' ? `${payload.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
   } catch (error: any) {
@@ -143,6 +146,8 @@ const adminLogin = async (payload: ILoginData): Promise<IAuthResponse> => {
     isUserExist.name!,
     isUserExist.email!,
   )
+
+  logger.info(`Admin logged in successfully: ${isUserExist.email}`)
 
   return authResponse(StatusCodes.OK, `Welcome back ${isUserExist.name}`, {
     role: isUserExist.role,
@@ -252,8 +257,10 @@ const forgetPassword = async (email: string) => {
   })
 
   emailHelper.sendEmail(forgetPasswordEmailTemplate).catch(err => {
-    console.error('Failed to send reset email:', err)
+    errorLogger.error('Failed to send reset email:', err)
   })
+
+  logger.info(`Password reset OTP sent to: ${sanitizedEmail}`)
 
   return config.app.node_env === 'development'
     ? `An otp-${otp} is being sent to ${email}`
@@ -316,6 +323,8 @@ const resetPassword = async (
     await Token.deleteOne({ _id: isTokenExist._id }).session(session)
 
     await session.commitTransaction()
+
+    logger.info(`Password reset successful for user: ${user.email}`)
 
     return {
       message: `Password reset successfully. You can now login with your new password.`,
@@ -425,6 +434,9 @@ const verifyAccount = async (
         user.name,
         user.email,
       )
+
+      logger.info(`Account verified successfully: ${user.email}`)
+
       return authResponse(StatusCodes.OK, `Welcome, ${user.name}.`, {
         role: user.role,
         accessToken: tokens.accessToken,
@@ -455,6 +467,8 @@ const verifyAccount = async (
       }).session(session)
 
       await session.commitTransaction()
+
+      logger.info(`Reset password OTP verified for: ${user.email}. Issued reset token.`)
 
       return authResponse(
         StatusCodes.OK,
@@ -527,6 +541,8 @@ const getRefreshToken = async (token: string) => {
       user.email,
     )
 
+    logger.info(`Token refreshed for user: ${user.email}`)
+
     return {
       accessToken: tokens.accessToken,
     }
@@ -565,6 +581,9 @@ const socialLogin = async (
       createdUser.name,
       createdUser.email,
     )
+
+    logger.info(`Social login (NEW USER): APP_ID:${appId}`)
+
     return authResponse(
       StatusCodes.OK,
       `Welcome ${createdUser.name} to our platform.`,
@@ -587,6 +606,9 @@ const socialLogin = async (
       isUserExist.name,
       isUserExist.email,
     )
+
+    logger.info(`Social login (EXISTING USER): APP_ID:${appId}`)
+
     //send token to client
     return authResponse(
       StatusCodes.OK,
@@ -684,6 +706,8 @@ const deleteAccount = async (user: JwtPayload, password: string) => {
     },
   })
 
+  logger.info(`Account deleted: ${isUserExist.email} (AuthID: ${authId})`)
+
   // 5. Success Response
   return 'Your account has been deleted successfully. We are sorry to see you go.'
 }
@@ -770,8 +794,10 @@ const resendOtp = async (
   })
 
   emailHelper.sendEmail(resendEmailTemplate).catch(err => {
-    console.error('Email Resend Failed:', err)
+    errorLogger.error('Email Resend Failed:', err)
   })
+
+  logger.info(`OTP resent to: ${sanitizedEmail} (Type: ${authType})`)
 
   const returnMessage = config.app.node_env === 'development' ? `Use this otp-${otp} to verify your account` : `A fresh OTP has been sent to your email.`
   return returnMessage
@@ -813,6 +839,7 @@ const changePassword = async (
   }
 
   // 4. Brute Force Protection (Login Lockout check)
+  // 4. Brute Force Protection (Login Lockout check)
   const {
     isRestricted,
     restrictionLeftAt,
@@ -822,6 +849,7 @@ const changePassword = async (
     const remaining = Math.ceil(
       (restrictionLeftAt.getTime() - Date.now()) / 60000,
     )
+    logger.warn(`Security lockout: Action blocked for ${isUserExist.email} (${remaining} mins left)`)
     throw new ApiError(
       StatusCodes.TOO_MANY_REQUESTS,
       `Security lockout active. Try again in ${remaining} minutes.`,
@@ -851,6 +879,12 @@ const changePassword = async (
       },
     })
 
+    if (shouldLock) {
+      logger.warn(`Brute force detection on change password: Locking account ${isUserExist.email}`)
+    } else {
+      logger.info(`Failed password change attempt: ${isUserExist.email} (Incorrect old password)`)
+    }
+
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
       'The old password you provided is incorrect.',
@@ -870,6 +904,8 @@ const changePassword = async (
   isUserExist.authentication.restrictionLeftAt = null
 
   await isUserExist.save()
+
+  logger.info(`Password changed successfully for user: ${isUserExist.email}`)
 
   return {
     message:
