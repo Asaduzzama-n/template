@@ -10,6 +10,7 @@ import { errorLogger, logger } from './shared/logger'
 import { socketHelper } from './helpers/socketHelper'
 import { UserServices } from './app/modules/user/user.service'
 import { setSocketIO } from './helpers/socketInstances'
+import { MaintenanceCron } from './app/modules/maintenance/maintenance.cron'
 
 // ─── Uncaught Exceptions (sync errors before event loop) ────────────────────
 process.on('uncaughtException', error => {
@@ -62,6 +63,9 @@ async function main() {
     // 6. Register socket handlers
     socketHelper.socket(io)
     setSocketIO(io)
+
+    // 7. Initialize Automated Maintenance (Cron)
+    await MaintenanceCron.initializeSchedule()
   } catch (error) {
     errorLogger.error(colors.red('🤢 Failed to start server:'), error)
     process.exit(1)

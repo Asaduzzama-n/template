@@ -1,0 +1,419 @@
+{
+  "info": {
+    "name": "Express Craft API Collection",
+    "description": "Postman Collection for the Express Craft template with all endpoints including Auth, User, Maintenance, Public, and Notifications.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"email\\\": \\\"user@example.com\\\",\\n    \\\"password\\\": \\\"StrongPass1!\\\",\\n    \\\"name\\\": \\\"Test User\\\",\\n    \\\"phone\\\": \\\"+1234567890\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/signup", "host": ["{{baseUrl}}"], "path": ["auth", "signup"] }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"email\\\": \\\"user@example.com\\\",\\n    \\\"password\\\": \\\"StrongPass1!\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"email\\\": \\\"admin@example.com\\\",\\n    \\\"password\\\": \\\"admin123!\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/admin-login", "host": ["{{baseUrl}}"], "path": ["auth", "admin-login"] }
+          }
+        },
+        {
+          "name": "Verify Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"otp\\\": 123456\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/verify-account", "host": ["{{baseUrl}}"], "path": ["auth", "verify-account"] }
+          }
+        },
+        {
+          "name": "Resend OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/resend-otp", "host": ["{{baseUrl}}"], "path": ["auth", "resend-otp"] }
+          }
+        },
+        {
+          "name": "Forget Password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"email\\\": \\\"user@example.com\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/forget-password", "host": ["{{baseUrl}}"], "path": ["auth", "forget-password"] }
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"newPassword\\\": \\\"NewStrongPass1!\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["auth", "reset-password"] }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"oldPassword\\\": \\\"StrongPass1!\\\",\\n    \\\"newPassword\\\": \\\"NewStrongPass1!\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/change-password", "host": ["{{baseUrl}}"], "path": ["auth", "change-password"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh-token", "host": ["{{baseUrl}}"], "path": ["auth", "refresh-token"] }
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"password\\\": \\\"StrongPass1!\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/delete-account", "host": ["{{baseUrl}}"], "path": ["auth", "delete-account"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "data",
+                  "value": "{\"name\":\"Updated Name\", \"phone\":\"+1987654321\"}",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/user/profile", "host": ["{{baseUrl}}"], "path": ["user", "profile"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Maintenance",
+      "item": [
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/maintenance/stats", "host": ["{{baseUrl}}"], "path": ["maintenance", "stats"] }
+          }
+        },
+        {
+          "name": "Purge Deleted Users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/maintenance/purge-deleted-users?days=30", "host": ["{{baseUrl}}"], "path": ["maintenance", "purge-deleted-users"], "query": [{ "key": "days", "value": "30" }] }
+          }
+        },
+        {
+          "name": "Clear Auth Cache",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/maintenance/clear-auth-cache", "host": ["{{baseUrl}}"], "path": ["maintenance", "clear-auth-cache"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/notifications", "host": ["{{baseUrl}}"], "path": ["notifications"] }
+          }
+        },
+        {
+          "name": "Update Single Notification",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/notifications/:id", "host": ["{{baseUrl}}"], "path": ["notifications", ":id"] }
+          }
+        },
+        {
+          "name": "Update All Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/notifications/all", "host": ["{{baseUrl}}"], "path": ["notifications", "all"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public / FAQ / Contact",
+      "item": [
+        {
+          "name": "Create Public Content",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"type\\\": \\\"terms\\\",\\n    \\\"content\\\": \\\"These are the terms and conditions...\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/public", "host": ["{{baseUrl}}"], "path": ["public"] }
+          }
+        },
+        {
+          "name": "Get Content By Type",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/public/terms", "host": ["{{baseUrl}}"], "path": ["public", "terms"] }
+          }
+        },
+        {
+          "name": "Delete Content",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/public/:id", "host": ["{{baseUrl}}"], "path": ["public", ":id"] }
+          }
+        },
+        {
+          "name": "Submit Contact Form",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"name\\\": \\\"John Doe\\\",\\n    \\\"email\\\": \\\"john@example.com\\\",\\n    \\\"message\\\": \\\"Need help with login.\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/public/contact", "host": ["{{baseUrl}}"], "path": ["public", "contact"] }
+          }
+        },
+        {
+          "name": "Create FAQ (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"question\\\": \\\"How to reset password?\\\",\\n    \\\"answer\\\": \\\"Go to forget password flow.\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/public/faq", "host": ["{{baseUrl}}"], "path": ["public", "faq"] }
+          }
+        },
+        {
+          "name": "Update FAQ (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n    \\\"question\\\": \\\"Updated question?\\\"\\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/public/faq/:id", "host": ["{{baseUrl}}"], "path": ["public", "faq", ":id"] }
+          }
+        },
+        {
+          "name": "Get Single FAQ",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/public/faq/single/:id", "host": ["{{baseUrl}}"], "path": ["public", "faq", "single", ":id"] }
+          }
+        },
+        {
+          "name": "Get All FAQs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/public/faq/all", "host": ["{{baseUrl}}"], "path": ["public", "faq", "all"] }
+          }
+        },
+        {
+          "name": "Delete FAQ (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": { "raw": "{{baseUrl}}/public/faq/:id", "host": ["{{baseUrl}}"], "path": ["public", "faq", ":id"] }
+          }
+        }
+      ]
+    }
+  ]
+}

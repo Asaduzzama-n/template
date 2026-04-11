@@ -14,6 +14,7 @@ const userSchema = new Schema<IUser, UserModel>(
       type: String,
       trim: true,
       unique: true,
+      required: true,
     },
     phone: {
       type: String,

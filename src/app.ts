@@ -103,24 +103,61 @@ app.get('/', (_req: Request, res: Response) => {
       justify-content: center;
       align-items: center;
       height: 100vh;
-      background: radial-gradient(circle at top left, #1e003e, #5e00a5);
-      color: #fff;
+      background: linear-gradient(135deg, #fff5e6 0%, #ffebcc 100%);
+      color: #333;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       text-align: center;
-      padding: 2rem;
+      overflow: hidden;
+      position: relative;
     ">
-      <div>
-        <h1 style="font-size: 3rem; margin-bottom: 1rem;">
-          🛑 Whoa there, hacker man.
+      <!-- Decorative Spiral Style (Hidden Leaf Vibe) -->
+      <div style="
+        position: absolute;
+        top: -100px;
+        right: -100px;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(255, 144, 0, 0.15) 0%, transparent 70%);
+        border-radius: 50%;
+      "></div>
+
+      <div style="
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(15px);
+        padding: 4rem;
+        border-radius: 24px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        max-width: 600px;
+        border-top: 6px solid #ff9000;
+        z-index: 10;
+      ">
+        <div style="font-size: 5rem; margin-bottom: 1.5rem;">🌀</div>
+        <h1 style="font-size: 2.5rem; margin-bottom: 1rem; color: #e67e00; text-transform: uppercase; letter-spacing: 2px; font-weight: 800;">
+          Dattebayo! 🍥
         </h1>
-        <p style="font-size: 1.4rem; line-height: 1.6;">
-          You really just typed <code style="color:#ffd700;">'/'</code> in your browser and expected magic?<br><br>
-          This isn't Hogwarts, and you're not the chosen one. 🧙‍♂️<br><br>
-          Honestly, even my 404 page gets more action than this route. 💀
+        <p style="font-size: 1.2rem; line-height: 1.6; color: #555;">
+          You've reached the gateway of the <br>
+          <span style="color: #ff9000; font-weight: 700;">Hidden Leaf Backend</span>. <br><br>
+          There's no jutsu at the root <code style="background: #fff; border: 1px solid #fee2b3; padding: 2px 8px; border-radius: 6px; color: #d97706; font-weight: 600;">'/'</code>, ninja. <br>
+          If you're looking for the API, it's hidden under <code style="color: #e67e00; font-weight: 600;">/api/v1</code>. ⚔️
         </p>
-        <p style="margin-top: 2rem; font-size: 1rem; opacity: 0.7;">
-          Now go back... and try something useful. Or not. I'm just a server.
+        <p style="margin-top: 2.5rem; font-size: 1rem; font-style: italic; color: #888; border-top: 1px solid #eee; pt: 1.5rem;">
+          "I'm not gonna run away, I never go back on my word! That's my nindo: my ninja way!"
         </p>
+      </div>
+      
+      <!-- Bottom Decorative Element -->
+      <div style="
+        position: absolute;
+        bottom: 2rem;
+        width: 100%;
+        font-size: 0.85rem;
+        color: #bfa58a;
+        font-weight: 600;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      ">
+        ESTABLISHED BY THE FIRST HOKAGE OF CODE
       </div>
     </div>
   `)
@@ -129,19 +166,73 @@ app.get('/', (_req: Request, res: Response) => {
 // ─── Global Error Handler ─────────────────────────────────────────────────────
 app.use(globalErrorHandler)
 
-// ─── 404 Handler ─────────────────────────────────────────────────────────────
+// ─── 404 Handler (Hybrid Ninja Guard) ────────────────────────────────────────
 app.use((req: Request, res: Response) => {
+
+  if (req.accepts('html')) {
+    res.status(StatusCodes.NOT_FOUND).send(`
+      <div style="
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: linear-gradient(135deg, #fff5e6 0%, #ffebcc 100%);
+        color: #333;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        text-align: center;
+        overflow: hidden;
+        position: relative;
+      ">
+        <div style="
+          background: rgba(255, 255, 255, 0.6);
+          backdrop-filter: blur(15px);
+          padding: 4rem;
+          border-radius: 24px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+          max-width: 600px;
+          border-top: 6px solid #ff4444; /* Red for Error/Warning */
+          z-index: 10;
+        ">
+          <div style="font-size: 5rem; margin-bottom: 1.5rem;">🐾</div>
+          <h1 style="font-size: 2.5rem; margin-bottom: 1rem; color: #ff4444; text-transform: uppercase; letter-spacing: 2px; font-weight: 800;">
+            404 NOT FOUND
+          </h1>
+          <p style="font-size: 1.2rem; line-height: 1.6; color: #555;">
+            Whoops! It looks like you've wandered into the <br>
+            <span style="color: #ff4444; font-weight: 700;">Forest of Death</span>. <br><br>
+            The jutsu at <code style="background: #fff; border: 1px solid #ffcccc; padding: 2px 8px; border-radius: 6px; color: #ff4444; font-weight: 600;">${req.originalUrl}</code> doesn't exist! <br>
+            Did your Shadow Clone get lost on the way? 💨
+          </p>
+          <a href="/" style="
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 0.8rem 2rem;
+            background: #ff9000;
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 144, 0, 0.3);
+          ">RETURN TO THE VILLAGE</a>
+        </div>
+      </div>
+    `)
+    return;
+  }
+
+  // 2. Default to JSON for API/Tooling requests
   res.status(StatusCodes.NOT_FOUND).json({
     success: false,
-    message: 'Lost, are we?',
+    message: 'Lost in the Forest of Death, skip? 🐾',
     errorMessages: [
       {
         path: req.originalUrl,
-        message: "Congratulations, you've reached a completely useless API endpoint 👏",
+        message:
+          "Your Shadow Clone couldn't find this jutsu (route). It just poofed! 💨",
       },
       {
-        path: '/docs',
-        message: 'Hint: Maybe try reading the docs next time? 📚',
+        path: '/api/v1',
+        message: "Hint: Try the main Chunin Exam gate at '/api/v1'! ⛩️",
       },
     ],
     timestamp: new Date().toISOString(),
