@@ -2,83 +2,75 @@ import { Request, Response, NextFunction } from 'express'
 import { StatusCodes } from 'http-status-codes'
 import multer, { FileFilterCallback } from 'multer'
 import sharp from 'sharp'
+import { randomBytes } from 'crypto'
 import ApiError from '../../errors/ApiError'
+import { logger, errorLogger } from '../../shared/logger'
 
+// ─── Allowed types per field ──────────────────────────────────────────────────
+const ALLOWED_TYPES: Record<string, string[]> = {
+  image: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
+  license: ['image/jpeg', 'image/png', 'image/jpg'],
+  signature: ['image/jpeg', 'image/png', 'image/jpg'],
+  businessProfile: ['image/jpeg', 'image/png', 'image/jpg'],
+  media: ['video/mp4', 'audio/mpeg'],
+  doc: ['application/pdf'],
+}
+
+const IMAGE_FIELDS = ['image', 'license', 'signature', 'businessProfile']
+
+// ─── Secure filename generator ────────────────────────────────────────────────
+const generateFilename = (mimetype: string): string => {
+  const ext = mimetype.split('/')[1].replace('jpeg', 'jpg')
+  // crypto.randomBytes is cryptographically secure — Math.random() is not
+  return `${Date.now()}-${randomBytes(8).toString('hex')}.${ext}`
+}
+
+// ─── Factory ──────────────────────────────────────────────────────────────────
 const fileUploadHandler = () => {
-  // Configure storage
   const storage = multer.memoryStorage()
 
-  // File filter
-  const filterFilter = async (
-    req: Request,
+  const fileFilter = (
+    _req: Request,
     file: Express.Multer.File,
     cb: FileFilterCallback,
   ) => {
-    try {
-      const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg']
-      const allowedMediaTypes = ['video/mp4', 'audio/mpeg']
-      const allowedDocTypes = ['application/pdf']
-
-      if (
-        ['image', 'license', 'signature', 'businessProfile'].includes(
-          file.fieldname,
-        )
-      ) {
-        if (allowedImageTypes.includes(file.mimetype)) {
-          cb(null, true)
-        } else {
-          cb(
-            new ApiError(
-              StatusCodes.BAD_REQUEST,
-              'Only .jpeg, .png, .jpg file supported',
-            ),
-          )
-        }
-      } else if (file.fieldname === 'media') {
-        if (allowedMediaTypes.includes(file.mimetype)) {
-          cb(null, true)
-        } else {
-          cb(
-            new ApiError(
-              StatusCodes.BAD_REQUEST,
-              'Only .mp4, .mp3 file supported',
-            ),
-          )
-        }
-      } else if (file.fieldname === 'doc') {
-        if (allowedDocTypes.includes(file.mimetype)) {
-          cb(null, true)
-        } else {
-          cb(new ApiError(StatusCodes.BAD_REQUEST, 'Only pdf supported'))
-        }
-      } else {
-        cb(new ApiError(StatusCodes.BAD_REQUEST, 'This file is not supported'))
-      }
-    } catch (error) {
-      cb(
+    const allowed = ALLOWED_TYPES[file.fieldname]
+    if (!allowed) {
+      return cb(
         new ApiError(
-          StatusCodes.INTERNAL_SERVER_ERROR,
-          'File validation failed',
+          StatusCodes.BAD_REQUEST,
+          `Unsupported field: '${file.fieldname}'`,
         ),
       )
     }
+    if (!allowed.includes(file.mimetype)) {
+      return cb(
+        new ApiError(
+          StatusCodes.BAD_REQUEST,
+          `Invalid file type '${file.mimetype}' for field '${file.fieldname}'. Allowed: ${allowed.join(', ')}`,
+        ),
+      )
+    }
+    cb(null, true)
   }
 
-  // Configure multer
   const upload = multer({
-    storage: storage,
-    fileFilter: filterFilter,
+    storage,
+    fileFilter,
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10 MB (adjust as needed)
-      files: 10, // Maximum number of files allowed
+      fileSize: 10 * 1024 * 1024, // 10 MB
+      files: 10,
     },
   }).fields([
     { name: 'image', maxCount: 5 },
+    { name: 'license', maxCount: 1 },
+    { name: 'signature', maxCount: 1 },
+    { name: 'businessProfile', maxCount: 1 },
     { name: 'media', maxCount: 3 },
     { name: 'doc', maxCount: 3 },
   ])
 
-  // Process uploaded images with Sharp
+  // ─── Image optimization with Sharp ─────────────────────────────────────────
   const processImages = async (
     req: Request,
     res: Response,
@@ -87,29 +79,46 @@ const fileUploadHandler = () => {
     if (!req.files) return next()
 
     try {
-      const imageFields = ['image', 'license', 'signature', 'businessProfile']
-
-      // Process each image field
-      for (const field of imageFields) {
-        const files = (req.files as any)[field]
+      for (const field of IMAGE_FIELDS) {
+        const files = (req.files as Record<string, Express.Multer.File[]>)[
+          field
+        ]
         if (!files) continue
 
-        // Process each file in the field
         for (const file of files) {
-          if (!file.mimetype.startsWith('image')) continue
+          if (!file.mimetype.startsWith('image/')) continue
 
-          // Resize and optimize the image
-          const optimizedBuffer = await sharp(file.buffer)
-            .resize(1024) // Resize to max width of 800px (maintain aspect ratio)
-            .jpeg({ quality: 80 }) // Compress with 80% quality
-            .png({ quality: 80 }) // Compress with 80% quality
-            .jpeg({ quality: 80 }) // Compress with 80% quality
-            .toBuffer()
+          try {
+            // Build Sharp pipeline — pick ONE output format, never chain conflicting formats
+            const isPng = file.mimetype === 'image/png'
+            const isWebp = file.mimetype === 'image/webp'
 
-          // Replace the original buffer with the optimized one
-          file.buffer = optimizedBuffer
+            const pipeline = sharp(file.buffer).resize({
+              width: 1024,
+              withoutEnlargement: true, // don't upscale small images
+            })
+
+            if (isPng) {
+              file.buffer = await pipeline.png({ quality: 80 }).toBuffer()
+            } else if (isWebp) {
+              file.buffer = await pipeline.webp({ quality: 80 }).toBuffer()
+            } else {
+              // JPEG (and jpg)
+              file.buffer = await pipeline.jpeg({ quality: 80 }).toBuffer()
+            }
+
+            // Assign secure filename for downstream use
+            file.originalname = generateFilename(file.mimetype)
+          } catch (sharpErr) {
+            errorLogger.error(
+              `Image optimization failed for field '${field}':`,
+              sharpErr,
+            )
+            // Degraded gracefully — continue with original buffer
+          }
         }
       }
+
       next()
     } catch (error) {
       next(
@@ -121,10 +130,29 @@ const fileUploadHandler = () => {
     }
   }
 
-  // Return middleware chain
   return (req: Request, res: Response, next: NextFunction) => {
     upload(req, res, err => {
-      if (err) return next(err)
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return next(
+              new ApiError(
+                StatusCodes.BAD_REQUEST,
+                'File too large. Maximum size is 10 MB.',
+              ),
+            )
+          }
+          if (err.code === 'LIMIT_FILE_COUNT') {
+            return next(
+              new ApiError(
+                StatusCodes.BAD_REQUEST,
+                'Too many files uploaded.',
+              ),
+            )
+          }
+        }
+        return next(err)
+      }
       processImages(req, res, next)
     })
   }

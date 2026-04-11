@@ -1,38 +1,57 @@
-import { Server } from 'socket.io';
+import { Server } from 'socket.io'
+import { logger, errorLogger } from '../shared/logger'
 
-// Type-safe socket instance export
+// ─── Socket.IO Instance Registry ─────────────────────────────────────────────
+// Use getSocketIO() / setSocketIO() instead of importing the raw variable.
+// This avoids circular dependency issues and is type-safe.
 
-export let socketIO: Server | null = null;
+let socketIO: Server | null = null
 
-export const setSocketIO = (io: Server) => {
-  socketIO = io;
-};
+export const setSocketIO = (io: Server): void => {
+  socketIO = io
+}
 
 export const getSocketIO = (): Server | null => {
-  return socketIO;
-};
+  return socketIO
+}
 
+// ─── Emit Helpers ─────────────────────────────────────────────────────────────
 
-// Generic emit function
+/**
+ * Emit an event to a specific room or to all connected clients.
+ * Returns `true` on success, `false` if Socket.IO is not yet initialized.
+ */
 export const emitEvent = (
-    event: string,
-    data: any,
-    room?: string
-  ): boolean => {
-    if (!socketIO) {
-      console.warn(`Socket.IO not initialized - Skipping event: ${event}`);
-      return false;
+  event: string,
+  data: unknown,
+  room?: string,
+): boolean => {
+  if (!socketIO) {
+    logger.warn(`Socket.IO not initialized — skipping event: ${event}`)
+    return false
+  }
+
+  try {
+    if (room) {
+      socketIO.to(room).emit(event, data)
+    } else {
+      socketIO.emit(event, data)
     }
-  
-    try {
-      if (room) {
-        socketIO.to(room).emit(event, data);
-      } else {
-        socketIO.emit(event, data);
-      }
-      return true;
-    } catch (error) {
-      console.error(`Socket emit failed for event ${event}:`, error);
-      return false;
-    }
-  };
+    return true
+  } catch (error) {
+    errorLogger.error(`Socket emit failed for event '${event}':`, error)
+    return false
+  }
+}
+
+/**
+ * Emit an event targeted to a specific user via their personal room.
+ * Room name convention: `user:<authId>`
+ */
+export const emitToUser = (
+  authId: string,
+  event: string,
+  data: unknown,
+): boolean => {
+  return emitEvent(event, data, `user:${authId}`)
+}

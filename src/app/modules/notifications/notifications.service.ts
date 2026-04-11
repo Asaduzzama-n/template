@@ -10,26 +10,29 @@ import { paginationHelper } from '../../../helpers/paginationHelper'
 
 const getNotifications = async (user: JwtPayload, paginationOptions: IPaginationOptions) => {
   const { page, limit, skip, sortBy, sortOrder } = paginationHelper.calculatePagination(paginationOptions)
-  const [result, total] = await Promise.all([
+  const [result, total, unreadCount] = await Promise.all([
     Notification.find({ to: user.authId })
-      .populate('to')
-      .populate('from')
+      // Select only safe fields — never expose full user documents
+      .populate('from', 'name profile _id')
+      .populate('to', 'name _id')
       .skip(skip)
       .limit(limit)
       .sort({ [sortBy]: sortOrder })
       .lean(),
     Notification.countDocuments({ to: user.authId }),
+    Notification.countDocuments({ to: user.authId, isRead: false }),
   ])
-  
-    return {
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-      data: result,
-    }
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      unreadCount,
+    },
+    data: result,
+  }
 }
 
 const readNotification = async (id: string) => {

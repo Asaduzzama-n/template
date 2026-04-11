@@ -55,7 +55,8 @@ const createUser = async (payload: IUser) => {
 
     emailHelper.sendEmail(createAccount)
 
-    return `${config.node_env === 'development' ? `${payload.email}, ${otp}` : 'An otp has been sent to your email, please check.'}`
+    // OTP is only logged server-side — never returned in the response
+    return 'An OTP has been sent to your email. Please check your inbox.'
   } catch (error: any) {
     await session.abortTransaction()
     if (error.code === 11000) {
@@ -210,12 +211,12 @@ const forgetPassword = async (email: string) => {
   })
 
   emailHelper.sendEmail(forgetPasswordEmailTemplate).catch(err => {
-    console.error('Failed to send reset email:', err)
+    import('../../../../shared/logger').then(({ errorLogger }) =>
+      errorLogger.error('Failed to send reset email:', err),
+    )
   })
 
-  return config.node_env === 'development'
-    ? `An otp-${otp} is being sent to ${email}`
-    : 'An OTP has been sent to your email. Please check your inbox.'
+  return 'An OTP has been sent to your email. Please check your inbox.'
 }
 
 const resetPassword = async (
@@ -689,11 +690,12 @@ const resendOtp = async (
   })
 
   emailHelper.sendEmail(resendEmailTemplate).catch(err => {
-    console.error('Email Resend Failed:', err)
+    import('../../../../shared/logger').then(({ errorLogger }) =>
+      errorLogger.error('Email resend failed:', err),
+    )
   })
 
-  const returnMessage = config.node_env === 'development' ? `Use this otp-${otp} to verify your account` : `A fresh OTP has been sent to your email.`
-  return returnMessage
+  return 'A fresh OTP has been sent to your email. Please check your inbox.'
 }
 
 const changePassword = async (

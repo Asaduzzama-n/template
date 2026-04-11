@@ -40,7 +40,10 @@ const handleGoogleLogin = async (
     profile: photos[0].value,
     name: displayName,
     verified: true,
-    password: id,
+    // Use a cryptographically random, unusable password — Google users cannot
+    // use password-based login, so this is never validated. Using the Google ID
+    // as the password was a confusing security anti-pattern.
+    password: require('crypto').randomBytes(32).toString('hex'),
     status: USER_STATUS.ACTIVE,
     appId: id,
     role: payload.role,
@@ -68,10 +71,10 @@ const handleGoogleLogin = async (
       },
     )
   } catch (error) {
-    await session.abortTransaction(session)
-    session.endSession()
+    await session.abortTransaction()
     throw error
   } finally {
+    // endSession only in finally to prevent double-call
     await session.endSession()
   }
 }

@@ -6,104 +6,85 @@ import { jwtHelper } from '../../helpers/jwtHelper'
 import ApiError from '../../errors/ApiError'
 import { USER_ROLES } from '../../enum/user'
 
-const auth =
+// ─── Auth Middleware Factory ──────────────────────────────────────────────────
+/**
+ * Factory that returns an auth middleware using the given JWT secret.
+ * Eliminates duplicated logic between `auth` and `tempAuth`.
+ */
+const makeAuth =
+  (secret: Secret) =>
   (...roles: string[]) =>
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const tokenWithBearer = req.headers.authorization
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const tokenWithBearer = req.headers.authorization
 
-        if (!tokenWithBearer) {
-          if (roles.includes(USER_ROLES.GUEST)) {
-            req.user = {
-              role: USER_ROLES.GUEST,
-            }
-            return next()
-          }
-          throw new ApiError(StatusCodes.NOT_FOUND, 'Token not found!')
-
+      // ── No token ──────────────────────────────────────────────────────────
+      if (!tokenWithBearer) {
+        // Allow guest-accessible routes through
+        if (roles.includes(USER_ROLES.GUEST)) {
+          req.user = { role: USER_ROLES.GUEST }
+          return next()
         }
-
-        if (tokenWithBearer && tokenWithBearer.startsWith('Bearer')) {
-          const token = tokenWithBearer.split(' ')[1]
-
-          try {
-            // Verify token
-            const verifyUser = jwtHelper.verifyToken(
-              token,
-              config.jwt.jwt_secret as Secret,
-            )
-
-            // Set user to header
-            req.user = verifyUser
-
-            // Guard user
-            if (roles.length && !roles.includes(verifyUser.role)) {
-              throw new ApiError(
-                StatusCodes.FORBIDDEN,
-                "You don't have permission to access this API",
-              )
-            }
-
-            next()
-          } catch (error) {
-            if (error instanceof Error && error.name === 'TokenExpiredError') {
-              throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
-            }
-            throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
-          }
-        }
-      } catch (error) {
-        next(error)
+        // 401 Unauthorized — not 404!
+        throw new ApiError(
+          StatusCodes.UNAUTHORIZED,
+          'Authentication required. Please provide a valid token.',
+        )
       }
-    }
 
+      // ── Extract token ─────────────────────────────────────────────────────
+      if (!tokenWithBearer.startsWith('Bearer ')) {
+        throw new ApiError(
+          StatusCodes.UNAUTHORIZED,
+          'Malformed authorization header. Expected format: Bearer <token>',
+        )
+      }
+
+      const token = tokenWithBearer.split(' ')[1]
+
+      try {
+        const verifyUser = jwtHelper.verifyToken(token, secret)
+
+        // Attach user to request
+        req.user = verifyUser
+
+        // Role guard
+        if (roles.length && !roles.includes(verifyUser.role)) {
+          throw new ApiError(
+            StatusCodes.FORBIDDEN,
+            "You don't have permission to access this resource.",
+          )
+        }
+
+        next()
+      } catch (error) {
+        if (error instanceof ApiError) throw error
+
+        if (error instanceof Error) {
+          if (error.name === 'TokenExpiredError') {
+            throw new ApiError(
+              StatusCodes.UNAUTHORIZED,
+              'Access token has expired. Please refresh your session.',
+            )
+          }
+          if (error.name === 'JsonWebTokenError') {
+            throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid access token.')
+          }
+        }
+
+        throw new ApiError(StatusCodes.UNAUTHORIZED, 'Token verification failed.')
+      }
+    } catch (error) {
+      next(error)
+    }
+  }
+
+// ─── Standard Auth (uses primary JWT secret) ─────────────────────────────────
+const auth = makeAuth(config.jwt.jwt_secret as Secret)
 export default auth
 
-
-
-//this temp auth middleware is created for temporary user verification before creating a new user
-//in the future, we will use the auth middleware above
-
-export const tempAuth =
-  (...roles: string[]) =>
-    async (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const tokenWithBearer = req.headers.authorization
-
-        if (!tokenWithBearer) {
-          throw new ApiError(StatusCodes.NOT_FOUND, 'Token not found!')
-        }
-
-        if (tokenWithBearer && tokenWithBearer.startsWith('Bearer')) {
-          const token = tokenWithBearer.split(' ')[1]
-
-          try {
-            // Verify token
-            const verifyUser = jwtHelper.verifyToken(
-              token,
-              config.jwt.temp_jwt_secret as Secret,
-            )
-
-            // Set user to header
-            req.user = verifyUser
-
-            // Guard user
-            if (roles.length && !roles.includes(verifyUser.role)) {
-              throw new ApiError(
-                StatusCodes.FORBIDDEN,
-                "You don't have permission to access this API",
-              )
-            }
-
-            next()
-          } catch (error) {
-            if (error instanceof Error && error.name === 'TokenExpiredError') {
-              throw new ApiError(StatusCodes.UNAUTHORIZED, 'Access Token has expired')
-            }
-            throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid Access Token')
-          }
-        }
-      } catch (error) {
-        next(error)
-      }
-    }
+// ─── Temp Auth (uses short-lived temp JWT secret for pre-verification flows) ──
+//
+// Used for temporary user verification before account creation is complete.
+// e.g. the OTP verification step that returns a temp token to proceed.
+export const tempAuth = makeAuth(config.jwt.temp_jwt_secret as Secret)

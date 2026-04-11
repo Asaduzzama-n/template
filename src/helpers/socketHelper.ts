@@ -1,23 +1,41 @@
 import colors from 'colors'
 import { Server, Socket } from 'socket.io'
 import { logger } from '../shared/logger'
-import { onlineUsers } from '../server'
-import { Notification } from '../app/modules/notifications/notifications.model'
+import { redisClient } from '../config/redis'
 import { USER_ROLES } from '../enum/user'
 import { JwtPayload } from 'jsonwebtoken'
 import { socketMiddleware } from '../app/middleware/socketAuth'
 
-
-// Define interface for socket with user data
+// ─── Socket user shape ────────────────────────────────────────────────────────
 export interface SocketWithUser extends Socket {
   user?: JwtPayload & {
     authId: string
     role: string
+    name?: string
+    email?: string
   }
 }
 
+// ─── Redis key helpers ────────────────────────────────────────────────────────
+const ONLINE_USERS_KEY = 'socket:online_users'
+
+const markUserOnline = (authId: string, socketId: string) =>
+  redisClient.hset(ONLINE_USERS_KEY, authId, socketId)
+
+const markUserOffline = (authId: string) =>
+  redisClient.hdel(ONLINE_USERS_KEY, authId)
+
+export const getUserSocketId = (authId: string) =>
+  redisClient.hget(ONLINE_USERS_KEY, authId)
+
+export const isUserOnline = async (authId: string): Promise<boolean> => {
+  const val = await redisClient.hexists(ONLINE_USERS_KEY, authId)
+  return val === 1
+}
+
+// ─── Socket setup ─────────────────────────────────────────────────────────────
 const socket = (io: Server) => {
-  // Apply authentication middleware to all connections
+  // Apply JWT auth middleware to all incoming connections
   io.use(
     socketMiddleware.socketAuth(
       USER_ROLES.CUSTOMER,
@@ -27,53 +45,43 @@ const socket = (io: Server) => {
     ),
   )
 
-  io.on('connection', (socket: SocketWithUser) => {
-    if (socket.user) {
-      onlineUsers.set(socket.id, socket.user.authId)
-      logger.info(colors.blue(`⚡ User ${socket.user.authId} connected`))
+  io.on('connection', async (socket: SocketWithUser) => {
+    if (!socket.user) return
 
-      // Send notifications only on initial connection
-      // sendNotificationsToAllConnectedUsers(socket)
+    const { authId } = socket.user
 
-      registerEventHandlers(socket)
-    }
+    // ── Track online status in Redis (survives multi-process) ─────────────────
+    await markUserOnline(authId, socket.id)
+    logger.info(colors.blue(`⚡ User ${authId} connected [${socket.id}]`))
+
+    // ── Join personal room for targeted events ────────────────────────────────
+    // Notifications, direct messages etc. are sent to `user:<authId>`
+    socket.join(`user:${authId}`)
+    logger.info(colors.blue(`📬 User ${authId} joined room user:${authId}`))
+
+    registerEventHandlers(socket, io)
   })
 }
 
-// Separate function to register all event handlers
-const registerEventHandlers = (socket: SocketWithUser) => {
-
-  // Disconnect handler
-  socket.on('disconnect', () => {
-    onlineUsers.delete(socket.id)
+// ─── Event Handlers ───────────────────────────────────────────────────────────
+const registerEventHandlers = (socket: SocketWithUser, _io: Server) => {
+  socket.on('disconnect', async () => {
+    const authId = socket.user?.authId
+    if (authId) {
+      await markUserOffline(authId)
+    }
     logger.info(
-      colors.red(`User ${socket.user?.authId || 'Unknown'} disconnected ⚡`),
+      colors.red(
+        `User ${socket.user?.authId ?? 'Unknown'} disconnected [${socket.id}]`,
+      ),
     )
   })
 }
 
-// const sendNotificationsToAllConnectedUsers = async (socket: SocketWithUser) => {
-//   try {
-//     const userId = socket.user?.authId
-//     if (!userId) return
-
-//     const [notifications, unreadCount] = await Promise.all([
-//       Notification.find({ receiver: userId }).populate([
-//         { path: 'sender', select: 'name profile' },
-//       ]).lean(),
-//       Notification.countDocuments({ receiver: userId, isRead: false }),
-//     ])
-
-//     socket.emit(`notification::${userId}`, {
-//       notifications,
-//       unreadCount,
-//     })
-//   } catch (error) {
-//     logger.error('Error sending notifications:', error)
-//   }
-// }
-
 export const socketHelper = {
   socket,
-  // sendNotificationsToAllConnectedUsers,`
+  markUserOnline,
+  markUserOffline,
+  getUserSocketId,
+  isUserOnline,
 }

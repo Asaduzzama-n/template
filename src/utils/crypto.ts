@@ -2,25 +2,35 @@ import crypto from 'crypto'
 import bcrypt from 'bcrypt'
 import config from '../config'
 
-const OTP_EXPIRY_MINUTES = 2
+// OTP expiry is now configurable via OTP_EXPIRY_MINUTES env var (default: 5 min)
+// Previously hardcoded to 2 minutes with no way to change it without code edits.
+const getOtpExpiryMinutes = (): number => config.otp_expiry_minutes
 
-const cryptoToken = () => {
+const cryptoToken = (): string => {
   return crypto.randomBytes(32).toString('hex')
 }
 
 export default cryptoToken
 
 export const hashOtp = async (otp: string): Promise<string> => {
-  const hashedOtp = await bcrypt.hash(otp, Number(config.bcrypt_salt_rounds))
-  return hashedOtp
+  return bcrypt.hash(otp, Number(config.bcrypt_salt_rounds))
 }
-export const compareOtp = async (otp: string, hashedOtp: string): Promise<boolean> => {
-  const isMatch = await bcrypt.compare(otp, hashedOtp)
-  return isMatch
+
+export const compareOtp = async (
+  otp: string,
+  hashedOtp: string,
+): Promise<boolean> => {
+  return bcrypt.compare(otp, hashedOtp)
 }
-export const generateOtp = async () => {
-  const otp = crypto.randomInt(100000, 999999).toString()
-  const expiresIn = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000)
+
+export const generateOtp = async (): Promise<{
+  otp: string
+  expiresIn: Date
+  hashedOtp: string
+}> => {
+  const expiryMinutes = getOtpExpiryMinutes()
+  const otp = crypto.randomInt(100_000, 999_999).toString()
+  const expiresIn = new Date(Date.now() + expiryMinutes * 60 * 1000)
   const hashedOtp = await hashOtp(otp)
-  return {otp, expiresIn, hashedOtp}
+  return { otp, expiresIn, hashedOtp }
 }

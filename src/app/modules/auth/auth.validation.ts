@@ -93,10 +93,13 @@ const createUserZodSchema = z.object({
         .email({ message: 'Invalid email format' }),
       password: z
         .string({ required_error: 'Password is required' })
-        .min(6, { message: 'Password must be at least 6 characters' })
-        .max(20, { message: 'Password must be at most 20 characters' })
-        .regex(/^(?=.*[A-Za-z])(?=.*\d)/, {
-          message: 'Password must contain at least one letter and one number',
+        .min(8, { message: 'Password must be at least 8 characters' })
+        .max(64, { message: 'Password must be at most 64 characters' })
+        .regex(/[A-Z]/, { message: 'Password must contain at least one uppercase letter' })
+        .regex(/[a-z]/, { message: 'Password must contain at least one lowercase letter' })
+        .regex(/\d/, { message: 'Password must contain at least one number' })
+        .regex(/[@$!%*?&#^()_\-+={}\[\]|:;<>,.?/~`]/, {
+          message: 'Password must contain at least one special character',
         }),
       name: z.string({ required_error: 'Name is required' }),
       phone: z.string({ required_error: 'Phone is required' }).optional(),
