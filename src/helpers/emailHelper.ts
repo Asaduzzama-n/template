@@ -28,7 +28,7 @@ transporter.verify().then(() => {
 })
 
 // ─── BullMQ Email Queue ───────────────────────────────────────────────────────
-const EMAIL_QUEUE_NAME = 'email:send'
+const EMAIL_QUEUE_NAME = 'email-send'
 
 export const emailQueue = new Queue(EMAIL_QUEUE_NAME, {
   connection: redisClient,

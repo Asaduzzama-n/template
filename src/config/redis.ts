@@ -38,7 +38,9 @@ export const redisClient = createRedisClient()
  * Throws if Redis cannot be reached (fast-fail in production).
  */
 export const connectRedis = async (): Promise<void> => {
-  await redisClient.connect()
+  if (redisClient.status === 'wait' || redisClient.status === 'end') {
+    await redisClient.connect()
+  }
 }
 
 /**

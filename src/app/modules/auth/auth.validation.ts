@@ -2,138 +2,124 @@ import { z } from 'zod'
 import { USER_ROLES } from '../../../enum/user'
 import { VERIFICATION_TYPE } from '../verification/verification.interface'
 
-const verifyAccountZodSchema = z.object({
-  body: z.object({
-    email: z
-      .string({ required_error: 'Email is required' })
-      .email({ message: 'Invalid email format' }),
-    type: z.nativeEnum(VERIFICATION_TYPE, { required_error: "Verification type is required." }),
-    oneTimeCode: z.string().min(1, { message: 'OTP is required' }),
-  }).strict(),
-})
+const passwordSchema = z
+  .string({ required_error: 'Password is required' })
+  .min(8, { message: 'Password must be at least 8 characters' })
+  .max(64, { message: 'Password must be at most 64 characters' })
+  .regex(/[A-Z]/, { message: 'Password must contain at least one uppercase letter' })
+  .regex(/[a-z]/, { message: 'Password must contain at least one lowercase letter' })
+  .regex(/\d/, { message: 'Password must contain at least one number' })
+  .regex(/[@$!%*?&#^()_\-+={}\[\]|:;<>,.?/~`]/, {
+    message: 'Password must contain at least one special character',
+  })
 
-const forgetPasswordZodSchema = z.object({
-  body: z.object({
-    email: z.string().email({ message: 'Invalid email format.' }),
-    phone: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\+?[1-9]\d{1,14}$/.test(value), {
-        message: 'Invalid phone number format',
-      }),
-  }),
-})
-
-const resetPasswordZodSchema = z.object({
-  body: z.object({
-    newPassword: z.string().min(8, { message: 'Password is required' }),
-    confirmPassword: z
-      .string()
-      .min(8, { message: 'Confirm Password is required' }),
-  }),
+const signupZodSchema = z.object({
+  body: z
+    .object({
+      name: z.string({ required_error: 'Name is required' }).trim().min(2),
+      email: z
+        .string({ required_error: 'Email is required' })
+        .email({ message: 'Invalid email format' })
+        .toLowerCase(),
+      password: passwordSchema,
+      phone: z.string().optional(),
+      address: z.string().optional(),
+      role: z.enum([USER_ROLES.ADMIN, USER_ROLES.USER, USER_ROLES.CUSTOMER], {
+        errorMap: () => ({ message: 'Invalid user role selected' }),
+      }).default(USER_ROLES.USER),
+    })
+    .strict(),
 })
 
 const loginZodSchema = z.object({
   body: z
     .object({
-      email: z.string().email({ message: 'Invalid email format.' }),
-      fcmToken: z.string().min(1).optional(),
-      password: z.string().min(6, { message: "Password is required, and must be 6 character long." }),
+      email: z.string().email({ message: 'Invalid email format' }).toLowerCase(),
+      password: z.string().min(1, 'Password is required'),
+      fcmToken: z.string().optional(),
     })
     .strict(),
 })
 
-const resendOtpZodSchema = z.object({
-  body: z.object({
-    email: z
-      .string()
-      .optional()
-      .refine(value => !value || /^\S+@\S+\.\S+$/.test(value), {
-        message: 'Invalid email format',
-      }),
-    type: z.nativeEnum(VERIFICATION_TYPE, { required_error: "Verification type is requried." }),
-
-  }),
-})
-
-const changePasswordZodSchema = z.object({
+const verifyAccountZodSchema = z.object({
   body: z
     .object({
-      currentPassword: z.string({
-        required_error: 'Current password is required',
-      }),
-      newPassword: z
-        .string({
-          required_error: 'New password is required',
-        })
-        .min(6, 'Password must be at least 6 characters'),
-      confirmPassword: z.string({
-        required_error: 'Confirm password is required',
-      }),
+      email: z.string().email().toLowerCase(),
+      type: z.nativeEnum(VERIFICATION_TYPE),
+      oneTimeCode: z.string().min(1, 'OTP is required'),
     })
-    .refine(data => data.newPassword === data.confirmPassword, {
+    .strict(),
+})
+
+const forgetPasswordZodSchema = z.object({
+  body: z
+    .object({
+      email: z.string().email().toLowerCase(),
+    })
+    .strict(),
+})
+
+const resetPasswordZodSchema = z.object({
+  body: z
+    .object({
+      newPassword: passwordSchema,
+      confirmPassword: z.string(),
+    })
+    .strict()
+    .refine((data) => data.newPassword === data.confirmPassword, {
       message: 'Passwords do not match',
       path: ['confirmPassword'],
     }),
 })
 
-const deleteAccount = z.object({
-  body: z.object({
-    password: z.string({
-      required_error: 'Password is required',
-    }),
-  }),
-})
-
-const createUserZodSchema = z.object({
+const changePasswordZodSchema = z.object({
   body: z
     .object({
-      email: z
-        .string({ required_error: 'Email is required' })
-        .email({ message: 'Invalid email format' }),
-      password: z
-        .string({ required_error: 'Password is required' })
-        .min(8, { message: 'Password must be at least 8 characters' })
-        .max(64, { message: 'Password must be at most 64 characters' })
-        .regex(/[A-Z]/, { message: 'Password must contain at least one uppercase letter' })
-        .regex(/[a-z]/, { message: 'Password must contain at least one lowercase letter' })
-        .regex(/\d/, { message: 'Password must contain at least one number' })
-        .regex(/[@$!%*?&#^()_\-+={}\[\]|:;<>,.?/~`]/, {
-          message: 'Password must contain at least one special character',
-        }),
-      name: z.string({ required_error: 'Name is required' }),
-      phone: z.string({ required_error: 'Phone is required' }).optional(),
-      address: z.string().optional(),
-      role: z.enum(
-        [
-          USER_ROLES.ADMIN,
-          USER_ROLES.USER,
-          USER_ROLES.GUEST,
-          USER_ROLES.CUSTOMER,
-        ],
-        {
-          message: 'Role must be one of admin, user, guest',
-        },
-      ),
+      currentPassword: z.string().min(1, 'Current password is required'),
+      newPassword: passwordSchema,
+      confirmPassword: z.string(),
+    })
+    .strict()
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: 'New passwords do not match',
+      path: ['confirmPassword'],
+    }),
+})
+
+const resendOtpZodSchema = z.object({
+  body: z
+    .object({
+      email: z.string().email().toLowerCase(),
+      type: z.nativeEnum(VERIFICATION_TYPE),
     })
     .strict(),
 })
 
 const socialLoginZodSchema = z.object({
-  body: z.object({
-    appId: z.string({ required_error: 'App ID is required' }),
-    fcmToken: z.string({ required_error: 'Device token is required' }),
-  }),
+  body: z
+    .object({
+      appId: z.string().min(1, 'App ID is required'),
+      fcmToken: z.string().min(1, 'FCM token is required'),
+    })
+    .strict(),
+})
+
+const deleteAccountZodSchema = z.object({
+  body: z
+    .object({
+      password: z.string().min(1, 'Password is required to confirm deletion'),
+    })
+    .strict(),
 })
 
 export const AuthValidations = {
+  signupZodSchema,
+  loginZodSchema,
   verifyAccountZodSchema,
   forgetPasswordZodSchema,
   resetPasswordZodSchema,
-  loginZodSchema,
-  resendOtpZodSchema,
   changePasswordZodSchema,
-  createUserZodSchema,
-  deleteAccount,
+  resendOtpZodSchema,
   socialLoginZodSchema,
+  deleteAccountZodSchema,
 }

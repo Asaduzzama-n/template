@@ -1,32 +1,26 @@
-export type IEmailOrPhoneOtpVerification = {
-    oneTimeCode: string
-    email?: string
-    phone?: string
-}
-
-export type IVerificationResponse = {
-    verified: boolean
-    message: string
-}
-
-export type IForgetPassword = {
-    email?: string
-    phone?: string
-}
-
-export type IResetPassword = {
-    email?: string
-    phone?: string
-    newPassword: string
-    confirmPassword: string
-}
-
+import { Types } from 'mongoose'
 
 export type IAuthResponse = {
-    status: number
-    message: string
-    role?: string
-    token?: string
-    accessToken?: string
-    refreshToken?: string
+  status: number
+  message: string
+  role?: string
+  accessToken?: string
+  refreshToken?: string
+  token?: string // for reset tokens
+}
+
+export type IVerifyAccountPayload = {
+  email: string
+  oneTimeCode: string
+  type: string // from VERIFICATION_TYPE
+}
+
+export type ISocialLoginPayload = {
+  appId: string
+  fcmToken: string
+}
+
+export type ITokenResponse = {
+  accessToken: string
+  refreshToken?: string
 }

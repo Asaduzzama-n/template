@@ -1,15 +1,17 @@
 import { NextFunction, Request, Response } from 'express'
-import { StatusCodes } from 'http-status-codes'
 import { Secret } from 'jsonwebtoken'
+import { StatusCodes } from 'http-status-codes'
 import config from '../../config'
 import { jwtHelper } from '../../helpers/jwtHelper'
 import ApiError from '../../errors/ApiError'
-import { USER_ROLES } from '../../enum/user'
+import { USER_ROLES, USER_STATUS } from '../../enum/user'
+import { User } from '../modules/user/user.model'
+import { AuthCache } from '../modules/auth/auth.cache'
+import { AuthHelper } from '../modules/auth/auth.helper'
 
 // ─── Auth Middleware Factory ──────────────────────────────────────────────────
 /**
  * Factory that returns an auth middleware using the given JWT secret.
- * Eliminates duplicated logic between `auth` and `tempAuth`.
  */
 const makeAuth =
   (secret: Secret) =>
@@ -25,7 +27,7 @@ const makeAuth =
           req.user = { role: USER_ROLES.GUEST }
           return next()
         }
-        // 401 Unauthorized — not 404!
+
         throw new ApiError(
           StatusCodes.UNAUTHORIZED,
           'Authentication required. Please provide a valid token.',
@@ -44,6 +46,57 @@ const makeAuth =
 
       try {
         const verifyUser = jwtHelper.verifyToken(token, secret)
+        const { authId, iat } = verifyUser
+
+        // ── Security Check (Instant Revocation) ─────────────────────────────
+        // 1. Check Redis Cache First (O(1) - Fast)
+        let securityData = await AuthCache.getAuthCache(authId)
+
+        // 2. Fallback to DB if cache miss
+        if (!securityData) {
+          const user = await User.findById(authId)
+            .select('+authentication')
+            .lean()
+          if (!user) {
+            throw new ApiError(
+              StatusCodes.UNAUTHORIZED,
+              'Account no longer exists.',
+            )
+          }
+
+          securityData = {
+            status: user.status,
+            passwordChangedAt:
+              user.authentication?.passwordChangedAt?.toISOString() || null,
+          }
+          // Populate cache for 1 hour
+          await AuthCache.setAuthCache(authId, securityData)
+        }
+
+        // 3. Status Invalidation
+        if (securityData.status === USER_STATUS.DELETED) {
+          throw new ApiError(
+            StatusCodes.FORBIDDEN,
+            'This account has been deleted.',
+          )
+        }
+        if (securityData.status === USER_STATUS.RESTRICTED) {
+          throw new ApiError(
+            StatusCodes.FORBIDDEN,
+            'Your access has been restricted.',
+          )
+        }
+
+        // 4. Password Change Invalidation
+        if (securityData.passwordChangedAt && iat) {
+          const changedAt = new Date(securityData.passwordChangedAt)
+          if (AuthHelper.isTokenInvalidated(changedAt, iat)) {
+            throw new ApiError(
+              StatusCodes.UNAUTHORIZED,
+              'Session expired due to password change. Please login again.',
+            )
+          }
+        }
 
         // Attach user to request
         req.user = verifyUser
@@ -68,11 +121,17 @@ const makeAuth =
             )
           }
           if (error.name === 'JsonWebTokenError') {
-            throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid access token.')
+            throw new ApiError(
+              StatusCodes.UNAUTHORIZED,
+              'Invalid access token.',
+            )
           }
         }
 
-        throw new ApiError(StatusCodes.UNAUTHORIZED, 'Token verification failed.')
+        throw new ApiError(
+          StatusCodes.UNAUTHORIZED,
+          'Token verification failed.',
+        )
       }
     } catch (error) {
       next(error)

@@ -8,7 +8,7 @@ import router from './routes'
 import { Morgan } from './shared/morgan'
 import cookieParser from 'cookie-parser'
 import globalErrorHandler from './app/middleware/globalErrorHandler'
-import passport from './app/modules/auth/passport.auth/config/passport'
+import passport from './app/modules/auth/strategies/google.strategy'
 import config from './config'
 
 const app = express()
