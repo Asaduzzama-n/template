@@ -1,0 +1,17 @@
+node_modules
+dist
+logs
+uploads
+.git
+.env
+Dockerfile
+docker-compose.yml
+README.md
+npm-debug.log
+yarn-error.log
+.vscode
+.idea
+.eslintignore
+.eslintrc
+.prettierrc
+tsconfig.json
