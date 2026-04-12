@@ -55,6 +55,13 @@ const envSchema = z.object({
   AWS_REGION: z.string().optional(),
   AWS_BUCKET_NAME: z.string().optional(),
 
+  // RustFS (S3 Compatible)
+  RUSTFS_ENDPOINT: z.string().optional(),
+  RUSTFS_ACCESS_KEY: z.string().optional(),
+  RUSTFS_SECRET_KEY: z.string().optional(),
+  RUSTFS_REGION: z.string().default('us-east-1'),
+  RUSTFS_BUCKET: z.string().optional(),
+
   // Firebase
   FIREBASE_SERVICE_ACCOUNT_BASE64: z.string().optional(),
 
@@ -145,6 +152,14 @@ export default {
     secret_access_key: env.AWS_SECRET_ACCESS_KEY,
     region: env.AWS_REGION,
     bucket_name: env.AWS_BUCKET_NAME,
+  },
+
+  rustfs: {
+    endpoint: env.RUSTFS_ENDPOINT,
+    access_key: env.RUSTFS_ACCESS_KEY,
+    secret_key: env.RUSTFS_SECRET_KEY,
+    region: env.RUSTFS_REGION,
+    bucket: env.RUSTFS_BUCKET,
   },
 
   firebase_service_account_base64: env.FIREBASE_SERVICE_ACCOUNT_BASE64,

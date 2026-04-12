@@ -5,6 +5,7 @@ import { StatusCodes } from 'http-status-codes'
 import path from 'path'
 import fs from 'fs'
 import sharp from 'sharp'
+import { RustFSHelper } from '../../helpers/image/rustFsHelper'
 
 type IFolderName = 'images' | 'media' | 'documents'
 interface ProcessedFiles {
@@ -269,6 +270,90 @@ export const fileAndBodyProcessorUsingDiskStorage = () => {
 
             // Store as array or single value based on maxCount
             processedFiles[fieldName] = maxCount > 1 ? paths : paths[0]
+          }
+
+          req.body = { ...req.body, ...processedFiles }
+        }
+
+        next()
+      } catch (err) {
+        next(err)
+      }
+    })
+  }
+}
+
+export const fileAndBodyProcessorUsingRustFS = () => {
+  const storage = multer.memoryStorage()
+
+  // File filter configuration
+  const fileFilter = (
+    req: Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback,
+  ) => {
+    try {
+      const allowedTypes = {
+        images: ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'],
+        media: ['video/mp4', 'audio/mpeg'],
+        documents: ['application/pdf'],
+      }
+
+      const fieldType = file.fieldname as IFolderName
+      if (!allowedTypes[fieldType]?.includes(file.mimetype)) {
+        return cb(
+          new ApiError(
+            StatusCodes.BAD_REQUEST,
+            `Invalid file type for ${file.fieldname}`,
+          ),
+        )
+      }
+      cb(null, true)
+    } catch (error) {
+      cb(
+        new ApiError(
+          StatusCodes.INTERNAL_SERVER_ERROR,
+          'File validation failed',
+        ),
+      )
+    }
+  }
+
+  const upload = multer({
+    storage,
+    fileFilter,
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+      files: 10,
+    },
+  }).fields(uploadFields)
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    upload(req, res, async error => {
+      if (error) return next(error)
+
+      try {
+        if (req.body?.data) {
+          req.body = JSON.parse(req.body.data)
+        }
+
+        if (req.files) {
+          const processedFiles: ProcessedFiles = {}
+          const fieldsConfig = new Map(
+            uploadFields.map(f => [f.name, f.maxCount]),
+          )
+
+          for (const [fieldName, files] of Object.entries(req.files)) {
+            const maxCount = fieldsConfig.get(fieldName as IFolderName) ?? 1
+            const fileArray = files as Express.Multer.File[]
+
+            // Upload files to RustFS
+            const urls = await RustFSHelper.uploadMultipleToRustFS(
+              fileArray,
+              fieldName,
+            )
+
+            processedFiles[fieldName] = maxCount > 1 ? urls : urls[0]
           }
 
           req.body = { ...req.body, ...processedFiles }

@@ -5,7 +5,7 @@ import validateRequest from '../../middleware/validateRequest'
 import auth from '../../middleware/auth'
 import { USER_ROLES } from '../../../enum/user'
 import {
-  fileAndBodyProcessorUsingDiskStorage,
+  fileAndBodyProcessorUsingRustFS,
 } from '../../middleware/processReqBody'
 
 const router = express.Router()
@@ -19,7 +19,7 @@ router.patch(
     USER_ROLES.USER,
     USER_ROLES.GUEST,
   ),
-  fileAndBodyProcessorUsingDiskStorage(),
+  fileAndBodyProcessorUsingRustFS(),
   validateRequest(UserValidations.updateUserZodSchema),
   UserController.updateProfile,
 )
